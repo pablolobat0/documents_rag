@@ -1,6 +1,6 @@
-def main():
-    print("Hello from documents-rag!")
+from src.agent import Agent
 
 
-if __name__ == "__main__":
-    main()
+agent = Agent()
+
+agent.run("Hola").pretty_print()
