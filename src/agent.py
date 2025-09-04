@@ -25,16 +25,5 @@ class Agent:
 
         return {"messages": [response]}
 
-    def run(self, query: str):
-        return self.graph.invoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": query,
-                    }
-                ]
-            }
-        )[
-            "messages"
-        ][-1]
+    def run(self, conversation: dict):
+        return self.graph.invoke(conversation)["messages"][-1].content
