@@ -15,12 +15,13 @@ load_dotenv()
 MODEL = os.getenv("MODEL", "qwen3:1.7b")
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
 
 class Agent:
     def __init__(self) -> None:
         self.llm = ChatOllama(model=MODEL)
-        embeddings = OllamaEmbeddings(model=EMBEDDINGS_MODEL)
+        embeddings = OllamaEmbeddings(model=EMBEDDINGS_MODEL, base_url=OLLAMA_URL)
 
         client = QdrantClient(url=QDRANT_URL)
 

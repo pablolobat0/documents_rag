@@ -20,6 +20,18 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "7869:11434"
+    tty: true
+    restart: always
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
 volumes:
   qdrant_data:
+  ollama_data:
 
