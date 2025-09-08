@@ -11,7 +11,7 @@ chat_router = APIRouter(prefix="/chat", tags=["chat"])
     "/",
     status_code=status.HTTP_200_OK,
 )
-async def create_patient(
+async def chat(
     conversation: ChatConversation,
     chat_service: ChatService = Depends(get_chat_service),
 ) -> str:

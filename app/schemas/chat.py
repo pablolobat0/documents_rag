@@ -8,4 +8,5 @@ class ChatMessage(BaseModel):
 
 
 class ChatConversation(BaseModel):
+    session_id: str
     messages: list[ChatMessage]

@@ -1,6 +1,7 @@
 import os
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt import tools_condition
 from langchain_ollama import OllamaEmbeddings
@@ -20,8 +21,9 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
 class Agent:
     def __init__(self) -> None:
-        self.llm = ChatOllama(model=MODEL)
+        self.llm = ChatOllama(model=MODEL, base_url=OLLAMA_URL)
         embeddings = OllamaEmbeddings(model=EMBEDDINGS_MODEL, base_url=OLLAMA_URL)
+        checkpointer = InMemorySaver()
 
         client = QdrantClient(url=QDRANT_URL)
 
@@ -66,7 +68,7 @@ class Agent:
             "generate_query_or_respond",
         )
 
-        self.graph = builder.compile()
+        self.graph = builder.compile(checkpointer=checkpointer)
 
     def generate_query_or_respond(self, state: MessagesState):
         response = self.llm.bind_tools(self.tools).invoke(state["messages"])
@@ -74,4 +76,6 @@ class Agent:
         return {"messages": [response]}
 
     def run(self, conversation: dict):
-        return self.graph.invoke(conversation)["messages"][-1].content
+        return self.graph.invoke(conversation, {"configurable": {"thread_id": "1"}})[
+            "messages"
+        ][-1].content

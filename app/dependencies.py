@@ -9,9 +9,10 @@ EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
+chat_service = ChatService()
 
 def get_chat_service():
-    return ChatService()
+    return chat_service
 
 
 def get_vector_storage_service():
