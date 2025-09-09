@@ -4,19 +4,13 @@ from src.agent import Agent
 
 
 class ChatService:
-
-    def __init__(self) -> None:
-        self.agents: dict[str, Agent] = {}
+    def __init__(self, agent: Agent) -> None:
+        self.agent = agent
 
     def chat(self, conversation: ChatConversation) -> str:
         session_id = conversation.session_id
-        if session_id not in self.agents:
-            self.agents[session_id] = Agent()
-
-        agent = self.agents[session_id]
-
         messages = conversation.model_dump()["messages"]
-        return agent.run(
+        return self.agent.run(
             {
                 "messages": [
                     (
@@ -26,5 +20,6 @@ class ChatService:
                     )
                     for message in messages
                 ]
-            }
+            },
+            session_id,
         )

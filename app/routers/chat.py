@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, status
 
 from app.schemas.chat import ChatConversation
 from app.dependencies import get_chat_service
-from app.services.chat_service import ChatService
+from app.services.chat import ChatService
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-@chat_router.get(
+@chat_router.post(
     "/",
     status_code=status.HTTP_200_OK,
 )

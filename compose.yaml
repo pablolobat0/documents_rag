@@ -5,10 +5,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - qdrant
+      - ollama
     develop:
       watch:
         - action: sync
-          path: ./backend
+          path: .
           target: /app
         - action: rebuild
           path: pyproject.toml
@@ -31,7 +37,14 @@ services:
     environment:
       - OLLAMA_HOST=0.0.0.0
 
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   qdrant_data:
   ollama_data:
-
+  redis_data:
