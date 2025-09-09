@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from langgraph.checkpoint.redis import RedisSaver
 from src.prompts import GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 from langchain_core.messages import SystemMessage
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
 
 load_dotenv()
 
@@ -17,7 +19,7 @@ MODEL = os.getenv("MODEL", "qwen3:1.7b")
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
 class Agent:
@@ -26,10 +28,19 @@ class Agent:
         embeddings = OllamaEmbeddings(model=EMBEDDINGS_MODEL, base_url=OLLAMA_URL)
         checkpointer = RedisSaver(REDIS_URL)
 
-        vector_store = QdrantVectorStore.from_existing_collection(
-            embedding=embeddings,
+        client = QdrantClient(url=QDRANT_URL)
+
+        vector_size = len(embeddings.embed_query("sample text"))
+
+        if not client.collection_exists("test"):
+            client.create_collection(
+                collection_name="test",
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+        vector_store = QdrantVectorStore(
+            client=client,
             collection_name="test",
-            url=QDRANT_URL,
+            embedding=embeddings,
         )
 
         self.retriever = vector_store.as_retriever()
@@ -71,9 +82,6 @@ class Agent:
         return {"messages": [response]}
 
     def run(self, conversation: dict, session_id: str):
-        docs = self.retriever.invoke("incidencia")
-        print(docs)
-
         return self.graph.invoke(
             conversation, {"configurable": {"thread_id": session_id}}
         )["messages"][-1].content

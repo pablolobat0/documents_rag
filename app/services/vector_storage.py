@@ -1,9 +1,12 @@
 import uuid
+import tempfile
+import os
 from qdrant_client import QdrantClient
 from langchain_ollama import OllamaEmbeddings
 from qdrant_client.models import Distance, VectorParams
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from qdrant_client.http import models
+from langchain_community.document_loaders import PyPDFLoader
 
 
 class VectorStorageService:
@@ -30,6 +33,8 @@ class VectorStorageService:
             separators=["\n\n", "\n", ".", " ", ""],
         )
         chunks = splitter.split_text(document_text)
+        if not chunks:
+            raise ValueError("El texto proporcionado está vacío")
 
         # Generate the embeddings for each chunk
         embeddings = self.embeddings.embed_documents(chunks)
@@ -41,8 +46,28 @@ class VectorStorageService:
                 models.PointStruct(
                     id=str(uuid.uuid4()),
                     vector=vector,
-                    payload={"text": chunk, **(metadata or {})},
+                    payload={
+                        "page_content": chunk,
+                        **(metadata or {}),
+                    },
                 )
             )
 
         self.client.upsert(collection_name="test", points=points)
+
+    def insert_pdf_document(
+        self, file_content: bytes, metadata: dict | None = None
+    ) -> None:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
+
+        try:
+            loader = PyPDFLoader(tmp_path)
+            pages = []
+            for page in loader.load():
+                pages.append(page.page_content)
+
+            self.insert_document(document_text="\n".join(pages), metadata=metadata)
+        finally:
+            os.remove(tmp_path)
