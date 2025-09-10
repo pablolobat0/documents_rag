@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -10,7 +11,7 @@ from langchain_qdrant import QdrantVectorStore
 from dotenv import load_dotenv
 from langgraph.checkpoint.redis import RedisSaver
 from src.prompts import GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 from langmem.short_term import SummarizationNode, RunningSummary
@@ -102,7 +103,6 @@ class Agent:
 
     def generate_query_or_respond(self, state: LLMInputState):
         summarize_messages = state["summarized_messages"]
-        print(summarize_messages)
         messages = state["messages"]
         system_prompt = GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 
@@ -112,26 +112,38 @@ class Agent:
             summarize_messages = summarize_messages[1:]
 
         # Put the tool call result in the array
-        tool_message = None
+        tool_message = []
         if messages and isinstance(messages[-1], ToolMessage):
-            tool_message = messages[-1]
+            tool_message = [messages[-2], messages[-1]]
 
         if tool_message:
             messages = (
                 [SystemMessage(content=system_prompt)]
                 + summarize_messages
-                + [tool_message]
+                + tool_message
             )
         else:
             messages = [SystemMessage(content=system_prompt)] + summarize_messages
 
         response = self.llm.bind_tools(self.tools).invoke(messages)
 
+        # Remove thinking
+        if isinstance(response, AIMessage):
+            cleaned_content = re.sub(
+                r"<think>.*?</think>", "", str(response.content), flags=re.DOTALL
+            ).strip()
+            response = AIMessage(
+                content=cleaned_content,
+                additional_kwargs=response.additional_kwargs,
+                response_metadata=response.response_metadata,
+                id=response.id,
+                tool_calls=response.tool_calls,
+                usage_metadata=response.usage_metadata,
+            )
+
         return {"messages": [response]}
 
     def run(self, conversation: dict, session_id: str):
-        a = self.graph.invoke(conversation, {"configurable": {"thread_id": session_id}})
-
-        print(a)
-
-        return a["messages"][-1].content
+        return self.graph.invoke(
+            conversation, {"configurable": {"thread_id": session_id}}
+        )["messages"][-1].content
