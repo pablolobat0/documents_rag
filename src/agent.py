@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
@@ -9,17 +10,33 @@ from langchain_qdrant import QdrantVectorStore
 from dotenv import load_dotenv
 from langgraph.checkpoint.redis import RedisSaver
 from src.prompts import GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
+from langmem.short_term import SummarizationNode, RunningSummary
+from langchain_core.messages.utils import count_tokens_approximately
+from langchain_core.messages import AnyMessage
 
 load_dotenv()
 
 MODEL = os.getenv("MODEL", "qwen3:1.7b")
+SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", "llama3.2:3b")
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+
+SUMMARY_TOKENS = 1024
+TOKENS_BEFORE_SUMMARY = 4096
+
+
+class State(MessagesState):
+    context: dict[str, RunningSummary]
+
+
+class LLMInputState(MessagesState):
+    summarized_messages: list[AnyMessage]
+    context: dict[str, Any]
 
 
 class Agent:
@@ -53,11 +70,21 @@ class Agent:
 
         self.tools = [retriever_tool]
 
-        builder = StateGraph(MessagesState)
+        summarization_node = SummarizationNode(
+            token_counter=count_tokens_approximately,
+            model=ChatOllama(model=SUMMARY_MODEL, base_url=OLLAMA_URL),
+            max_tokens=TOKENS_BEFORE_SUMMARY,
+            max_tokens_before_summary=TOKENS_BEFORE_SUMMARY,
+            max_summary_tokens=SUMMARY_TOKENS,
+        )
+
+        builder = StateGraph(State)
         builder.add_node("generate_query_or_respond", self.generate_query_or_respond)
         builder.add_node("retrieve", ToolNode([retriever_tool]))
+        builder.add_node("summarize", summarization_node)
 
-        builder.add_edge(START, "generate_query_or_respond")
+        builder.add_edge(START, "summarize")
+        builder.add_edge("summarize", "generate_query_or_respond")
         builder.add_conditional_edges(
             "generate_query_or_respond",
             tools_condition,
@@ -73,15 +100,38 @@ class Agent:
 
         self.graph = builder.compile(checkpointer=checkpointer)
 
-    def generate_query_or_respond(self, state: MessagesState):
-        messages = [
-            SystemMessage(content=GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT)
-        ] + state["messages"]
+    def generate_query_or_respond(self, state: LLMInputState):
+        summarize_messages = state["summarized_messages"]
+        print(summarize_messages)
+        messages = state["messages"]
+        system_prompt = GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
+
+        # Avoid two system messages
+        if summarize_messages and isinstance(summarize_messages[0], SystemMessage):
+            system_prompt = f"{system_prompt}\n\n{summarize_messages[0].content}"
+            summarize_messages = summarize_messages[1:]
+
+        # Put the tool call result in the array
+        tool_message = None
+        if messages and isinstance(messages[-1], ToolMessage):
+            tool_message = messages[-1]
+
+        if tool_message:
+            messages = (
+                [SystemMessage(content=system_prompt)]
+                + summarize_messages
+                + [tool_message]
+            )
+        else:
+            messages = [SystemMessage(content=system_prompt)] + summarize_messages
+
         response = self.llm.bind_tools(self.tools).invoke(messages)
 
         return {"messages": [response]}
 
     def run(self, conversation: dict, session_id: str):
-        return self.graph.invoke(
-            conversation, {"configurable": {"thread_id": session_id}}
-        )["messages"][-1].content
+        a = self.graph.invoke(conversation, {"configurable": {"thread_id": session_id}})
+
+        print(a)
+
+        return a["messages"][-1].content
