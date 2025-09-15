@@ -1,21 +1,28 @@
 import uuid
-import tempfile
-import os
 from qdrant_client import QdrantClient
 from langchain_ollama import OllamaEmbeddings
 from qdrant_client.models import Distance, VectorParams
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from qdrant_client.http import models
-from langchain_community.document_loaders import PyPDFLoader
+from app.services.image_captioning import ImageCaptioningService
+import pypdf
+import io
 
 
 class VectorStorageService:
 
-    def __init__(self, url: str, embeddings_model: str, embeddings_url: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        embeddings_model: str,
+        embeddings_url: str,
+        image_captioning_service: ImageCaptioningService,
+    ) -> None:
         self.client = QdrantClient(url=url)
         self.embeddings = OllamaEmbeddings(
             model=embeddings_model, base_url=embeddings_url
         )
+        self.image_captioning_service = image_captioning_service
 
         vector_size = len(self.embeddings.embed_query("sample text"))
 
@@ -25,14 +32,18 @@ class VectorStorageService:
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
 
-    def insert_document(self, document_text: str, metadata: dict | None = None) -> None:
+    def insert_documents(
+        self,
+        documents_text: list[str],
+        metadatas: list[dict] | None = None,
+    ) -> None:
         # Split in chunks for an improved retrieval
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
             chunk_overlap=50,
             separators=["\n\n", "\n", ".", " ", ""],
         )
-        chunks = splitter.split_text(document_text)
+        chunks = splitter.split_text("\n".join(documents_text))
         if not chunks:
             raise ValueError("El texto proporcionado está vacío")
 
@@ -48,26 +59,26 @@ class VectorStorageService:
                     vector=vector,
                     payload={
                         "page_content": chunk,
-                        **(metadata or {}),
+                        **(metadatas or {}),
                     },
                 )
             )
 
         self.client.upsert(collection_name="test", points=points)
 
-    def insert_pdf_document(
-        self, file_content: bytes, metadata: dict | None = None
-    ) -> None:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(file_content)
-            tmp_path = tmp.name
+    def insert_pdf_document(self, file_content: bytes) -> None:
+        pdf_file = io.BytesIO(file_content)
+        pdf_reader = pypdf.PdfReader(pdf_file)
 
-        try:
-            loader = PyPDFLoader(tmp_path)
-            pages = []
-            for page in loader.load():
-                pages.append(page.page_content)
+        documents = []
+        metadatas = []
 
-            self.insert_document(document_text="\n".join(pages), metadata=metadata)
-        finally:
-            os.remove(tmp_path)
+        for page in pdf_reader.pages:
+            documents.append(page.extract_text())
+            for image in page.images:
+                image_summary = self.image_captioning_service.get_image_summary(
+                    image.data
+                )
+                documents.append(image_summary)
+
+        self.insert_documents(documents_text=documents, metadatas=metadatas)
