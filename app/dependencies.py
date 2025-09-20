@@ -1,5 +1,8 @@
 import os
+
+from langchain_ollama import ChatOllama
 from app.services.chat import ChatService
+from app.services.metadata import MetadataService
 from app.services.vector_storage import VectorStorageService
 from app.services.image_captioning import ImageCaptioningService
 from src.agent import Agent
@@ -12,10 +15,15 @@ IMAGE_CAPTIONING_MODEL = os.getenv("IMAGE_CAPTIONING_MODEL", "llava")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
+model = ChatOllama(model=IMAGE_CAPTIONING_MODEL, base_url=OLLAMA_URL)
+
 agent = Agent()
 chat_service = ChatService(agent=agent)
 image_captioning_service = ImageCaptioningService(
     model=IMAGE_CAPTIONING_MODEL, base_url=OLLAMA_URL
+)
+metadata_service = MetadataService(
+    model=model
 )
 
 
@@ -29,5 +37,5 @@ def get_vector_storage_service():
         embeddings_url=OLLAMA_URL,
         embeddings_model=EMBEDDINGS_MODEL,
         image_captioning_service=image_captioning_service,
-        image_storage_service=image_storage_service,
+        metadata_service=metadata_service
     )

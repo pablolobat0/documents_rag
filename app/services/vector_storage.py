@@ -8,6 +8,8 @@ from app.services.image_captioning import ImageCaptioningService
 import pypdf
 import io
 
+from app.services.metadata import MetadataService
+
 
 class VectorStorageService:
 
@@ -17,12 +19,14 @@ class VectorStorageService:
         embeddings_model: str,
         embeddings_url: str,
         image_captioning_service: ImageCaptioningService,
+        metadata_service: MetadataService,
     ) -> None:
         self.client = QdrantClient(url=url)
         self.embeddings = OllamaEmbeddings(
             model=embeddings_model, base_url=embeddings_url
         )
         self.image_captioning_service = image_captioning_service
+        self.metadata_service = metadata_service
 
         vector_size = len(self.embeddings.embed_query("sample text"))
 
@@ -37,6 +41,8 @@ class VectorStorageService:
         documents_text: list[str],
         metadatas: list[dict] | None = None,
     ) -> None:
+        metadata = self.metadata_service.extract_metadata("\n".join(documents_text), 0)
+
         # Split in chunks for an improved retrieval
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
@@ -71,6 +77,7 @@ class VectorStorageService:
         pdf_reader = pypdf.PdfReader(pdf_file)
 
         documents = []
+        # TODO: add document name and page number in metadata for sources
         metadatas = []
 
         for page in pdf_reader.pages:

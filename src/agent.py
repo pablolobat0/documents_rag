@@ -30,6 +30,9 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 SUMMARY_TOKENS = 1024
 TOKENS_BEFORE_SUMMARY = 4096
 
+# TODO: add Rerank, judge model, improve tool response to store sources for the model response, evaluate other vector search functions
+# add a function to check if the models are downloaded in Ollama and inject the model into de Agent
+
 
 class State(MessagesState):
     context: dict[str, RunningSummary]
