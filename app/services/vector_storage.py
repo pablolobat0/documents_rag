@@ -129,7 +129,8 @@ class VectorStorageService:
                 image_summary = self.image_captioning_service.get_image_summary(
                     image.data
                 )
-                documents.append(image_summary)
+                if image_summary is not None:
+                    documents.append(image_summary)
 
         # Update file_info with correct page count
         if file_info:

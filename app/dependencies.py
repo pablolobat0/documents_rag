@@ -12,6 +12,8 @@ load_dotenv()
 
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 IMAGE_CAPTIONING_MODEL = os.getenv("IMAGE_CAPTIONING_MODEL", "llava")
+MIN_IMAGE_WIDTH = int(os.getenv("MIN_IMAGE_WIDTH", "100"))
+MIN_IMAGE_HEIGHT = int(os.getenv("MIN_IMAGE_HEIGHT", "100"))
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
@@ -20,7 +22,10 @@ model = ChatOllama(model=IMAGE_CAPTIONING_MODEL, base_url=OLLAMA_URL)
 agent = Agent()
 chat_service = ChatService(agent=agent)
 image_captioning_service = ImageCaptioningService(
-    model=IMAGE_CAPTIONING_MODEL, base_url=OLLAMA_URL
+    model=IMAGE_CAPTIONING_MODEL,
+    base_url=OLLAMA_URL,
+    min_width=MIN_IMAGE_WIDTH,
+    min_height=MIN_IMAGE_HEIGHT
 )
 metadata_service = MetadataService(
     model=model
