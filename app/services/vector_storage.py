@@ -114,29 +114,55 @@ class VectorStorageService:
     def insert_pdf_document(
         self, file_content: bytes, file_info: dict | None = None
     ) -> None:
-        pdf_file = io.BytesIO(file_content)
-        pdf_reader = pypdf.PdfReader(pdf_file)
+        try:
+            pdf_file = io.BytesIO(file_content)
+            pdf_reader = pypdf.PdfReader(pdf_file)
 
-        documents = []
-        # TODO: add document name and page number in metadata for sources
-        metadatas = []
+            # Validate PDF is not encrypted or damaged
+            if pdf_reader.is_encrypted:
+                raise ValueError("Encrypted PDF files are not supported")
 
-        # Count actual PDF pages
-        pdf_pages = len(pdf_reader.pages)
+            documents = []
+            # TODO: add document name and page number in metadata for sources
+            metadatas = []
 
-        for page in pdf_reader.pages:
-            documents.append(page.extract_text())
-            for image in page.images:
-                image_summary = self.image_captioning_service.get_image_summary(
-                    image.data
-                )
-                if image_summary is not None:
-                    documents.append(image_summary)
+            # Count actual PDF pages
+            pdf_pages = len(pdf_reader.pages)
 
-        # Update file_info with correct page count
-        if file_info:
-            file_info["pages"] = pdf_pages
+            if pdf_pages == 0:
+                raise ValueError("PDF has no pages")
 
-        self.insert_documents(
-            documents_text=documents, metadatas=metadatas, file_info=file_info
-        )
+            for page_num, page in enumerate(pdf_reader.pages):
+                try:
+                    text = page.extract_text()
+                    if text.strip():  # Only add non-empty text
+                        documents.append(text)
+
+                    # Process images in the page
+                    for image in page.images:
+                        try:
+                            image_summary = self.image_captioning_service.get_image_summary(
+                                image.data
+                            )
+                            if image_summary is not None:
+                                documents.append(image_summary)
+                        except Exception as e:
+                            # Log image processing error but continue with other images
+                            print(f"Warning: Could not process image on page {page_num}: {e}")
+                except Exception as e:
+                    print(f"Warning: Could not process page {page_num}: {e}")
+                    continue
+
+            if not documents:
+                raise ValueError("No extractable content found in PDF")
+
+            # Update file_info with correct page count
+            if file_info:
+                file_info["pages"] = pdf_pages
+
+            self.insert_documents(
+                documents_text=documents, metadatas=metadatas, file_info=file_info
+            )
+
+        except Exception as e:
+            raise ValueError(f"Failed to process PDF: {str(e)}")

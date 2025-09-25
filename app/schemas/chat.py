@@ -10,3 +10,11 @@ class ChatMessage(BaseModel):
 class ChatConversation(BaseModel):
     session_id: str
     messages: list[ChatMessage]
+
+
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+    timestamp: str | None = None
+    sources_used: list[str] | None = None
+    tool_calls: list[str] | None = None
