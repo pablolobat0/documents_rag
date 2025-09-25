@@ -6,11 +6,8 @@ from app.schemas.metadata import (
     DocumentClassification,
 )
 from app.services.metadata_storage import MetadataStorageService
-from typing import Union, Optional
+from typing import Union
 import re
-import os
-from datetime import datetime
-from pathlib import Path
 
 CV_THRESHOLD = 8.0
 RECEIPT_THRESHOLD = 8.0

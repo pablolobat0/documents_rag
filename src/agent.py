@@ -25,6 +25,7 @@ MODEL = os.getenv("MODEL", "qwen3:1.7b")
 SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", "llama3.2:3b")
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "documents")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
@@ -54,14 +55,14 @@ class Agent:
 
         vector_size = len(embeddings.embed_query("sample text"))
 
-        if not client.collection_exists("test"):
+        if not client.collection_exists(QDRANT_COLLECTION_NAME):
             client.create_collection(
-                collection_name="test",
+                collection_name=QDRANT_COLLECTION_NAME,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
         vector_store = QdrantVectorStore(
             client=client,
-            collection_name="test",
+            collection_name=QDRANT_COLLECTION_NAME,
             embedding=embeddings,
         )
 

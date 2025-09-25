@@ -8,7 +8,6 @@ from app.services.image_captioning import ImageCaptioningService
 import pypdf
 import io
 from datetime import datetime
-from pathlib import Path
 
 from app.services.metadata import MetadataService
 from app.schemas.metadata import Metadata
@@ -19,12 +18,14 @@ class VectorStorageService:
     def __init__(
         self,
         url: str,
+        collection_name: str,
         embeddings_model: str,
         embeddings_url: str,
         image_captioning_service: ImageCaptioningService,
         metadata_service: MetadataService,
     ) -> None:
         self.client = QdrantClient(url=url)
+        self.collection_name = collection_name
         self.embeddings = OllamaEmbeddings(
             model=embeddings_model, base_url=embeddings_url
         )
@@ -33,9 +34,9 @@ class VectorStorageService:
 
         vector_size = len(self.embeddings.embed_query("sample text"))
 
-        if not self.client.collection_exists("test"):
+        if not self.client.collection_exists(self.collection_name):
             self.client.create_collection(
-                collection_name="test",
+                collection_name=self.collection_name,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
 
@@ -88,7 +89,7 @@ class VectorStorageService:
                 )
             )
 
-        self.client.upsert(collection_name="test", points=points)
+        self.client.upsert(collection_name=self.collection_name, points=points)
 
     def _create_base_metadata(self, file_info: dict | None, pages: int) -> Metadata:
         """

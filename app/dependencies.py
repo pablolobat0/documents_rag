@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
-IMAGE_CAPTIONING_MODEL = os.getenv("IMAGE_CAPTIONING_MODEL", "llava")
+IMAGE_CAPTIONING_MODEL = os.getenv("IMAGE_CAPTIONING_MODEL", "gemma3:4b")
 MIN_IMAGE_WIDTH = int(os.getenv("MIN_IMAGE_WIDTH", "100"))
 MIN_IMAGE_HEIGHT = int(os.getenv("MIN_IMAGE_HEIGHT", "100"))
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "documents")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
 model = ChatOllama(model=IMAGE_CAPTIONING_MODEL, base_url=OLLAMA_URL)
@@ -39,6 +40,7 @@ def get_chat_service():
 def get_vector_storage_service():
     return VectorStorageService(
         url=QDRANT_URL,
+        collection_name=QDRANT_COLLECTION_NAME,
         embeddings_url=OLLAMA_URL,
         embeddings_model=EMBEDDINGS_MODEL,
         image_captioning_service=image_captioning_service,
