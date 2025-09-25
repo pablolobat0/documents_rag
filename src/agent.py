@@ -6,12 +6,13 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt import tools_condition
 from langchain_ollama import OllamaEmbeddings
-from langchain.tools.retriever import create_retriever_tool
+from langchain.tools import Tool
 from langchain_qdrant import QdrantVectorStore
 from dotenv import load_dotenv
 from langgraph.checkpoint.redis import RedisSaver
-from src.prompts import GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
+from src.prompts import GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT, RERANK_SYSTEM_PROMPT
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
+from src.schemas import RankedDocuments
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 from langmem.short_term import SummarizationNode, RunningSummary
@@ -64,12 +65,16 @@ class Agent:
             embedding=embeddings,
         )
 
-        self.retriever = vector_store.as_retriever()
+        self.retriever = vector_store.as_retriever(
+            search_type="mmr", search_kwargs={"k": 10}
+        )
+        self.vector_store = vector_store
 
-        retriever_tool = create_retriever_tool(
-            self.retriever,
-            "retrieve_documents",
-            "Accesses a vector database to find and return relevant document snippets based on a query.",
+        # Create custom tool with retrieval
+        retriever_tool = Tool(
+            name="search_documents",
+            description="Searches through uploaded documents to find relevant information based on a query. Returns document snippets that can be used to answer user questions.",
+            func=self.retrieve_documents,
         )
 
         self.tools = [retriever_tool]
@@ -109,24 +114,35 @@ class Agent:
         messages = state["messages"]
         system_prompt = GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 
-        # Avoid two system messages
-        if summarize_messages and isinstance(summarize_messages[0], SystemMessage):
-            system_prompt = f"{system_prompt}\n\n{summarize_messages[0].content}"
-            summarize_messages = summarize_messages[1:]
-
-        # Put the tool call result in the array
+        # Check if we have tool results to include
         tool_message = []
-        if messages and isinstance(messages[-1], ToolMessage):
+        if messages and isinstance(messages[-1], ToolMessage) and len(messages) >= 2:
             tool_message = [messages[-2], messages[-1]]
 
+        # Determine which messages to use as context
+        if summarize_messages:
+            # Use summarized messages if available
+            context_messages = summarize_messages
+        else:
+            # Use original messages if no summary exists
+            # But exclude the last 2 messages if they're tool-related (AI request + Tool response)
+            if tool_message:
+                context_messages = messages[:-2]
+            else:
+                context_messages = messages
+
+        # Avoid two system messages when using summary
+        if context_messages and isinstance(context_messages[0], SystemMessage):
+            system_prompt = f"{system_prompt}\n\n{context_messages[0].content}"
+            context_messages = context_messages[1:]
+
+        # Build the final message list
         if tool_message:
             messages = (
-                [SystemMessage(content=system_prompt)]
-                + summarize_messages
-                + tool_message
+                [SystemMessage(content=system_prompt)] + context_messages + tool_message
             )
         else:
-            messages = [SystemMessage(content=system_prompt)] + summarize_messages
+            messages = [SystemMessage(content=system_prompt)] + context_messages
 
         response = self.llm.bind_tools(self.tools).invoke(messages)
 
@@ -145,6 +161,59 @@ class Agent:
             )
 
         return {"messages": [response]}
+
+    def retrieve_documents(self, query: str) -> list[str]:
+        """Search documents and return relevant snippets based on the query.
+
+        This method performs a semantic search through the uploaded documents
+        to find content that matches the user's query. It uses vector embeddings
+        to understand the meaning and context of the query, returning the most
+        relevant document snippets.
+
+        Args:
+            query (str): The search query describing what information is needed
+
+        Returns:
+            list[str]: List of relevant document snippets, or empty list if no matches found
+        """
+        try:
+            # Step 1: Retrieve documents from vector store
+            retrieved_docs = self.retriever.invoke(query)
+
+            if not retrieved_docs:
+                return []
+
+            # Step 2: Prepare documents for re-ranking
+            documents_content = [doc.page_content for doc in retrieved_docs]
+
+            # Step 3: Use structured LLM for re-ranking
+            structured_llm = self.llm.with_structured_output(RankedDocuments)
+
+            # Format documents for the prompt
+            formatted_docs = "\n\n".join(
+                [
+                    f"Document {i}: {content}"
+                    for i, content in enumerate(documents_content)
+                ]
+            )
+
+            rerank_prompt = f"{RERANK_SYSTEM_PROMPT}\n\nQuery: {query}\n\nRetrieved Documents:\n{formatted_docs}"
+
+            result = structured_llm.invoke([SystemMessage(content=rerank_prompt)])
+
+            # Step 4: Extract useful documents based on re-ranking
+            if hasattr(result, "documents"):
+                useful_docs = []
+                for doc_rel in result.documents:
+                    if doc_rel.is_useful and doc_rel.index < len(documents_content):
+                        useful_docs.append(documents_content[doc_rel.index])
+
+                return useful_docs
+            else:
+                return []
+
+        except Exception as e:
+            return [f"Error during retrieval and re-ranking: {e}"]
 
     def run(self, conversation: dict, session_id: str):
         return self.graph.invoke(
