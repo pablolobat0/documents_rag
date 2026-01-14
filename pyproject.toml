@@ -1,11 +1,11 @@
 [project]
 name = "documents-rag"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "RAG system with Streamlit UI"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[standard]>=0.116.1",
+    "streamlit>=1.40.0",
     "langchain>=0.3.27",
     "langchain-ollama>=0.3.7",
     "langchain-qdrant>=0.2.0",
@@ -19,3 +19,10 @@ dependencies = [
     "langmem>=0.0.29",
     "pillow>=10.4.0",
 ]
+
+[tool.black]
+line-length = 88
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]

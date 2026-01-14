@@ -1,4 +1,3 @@
-from typing import List, Optional
 from pydantic import BaseModel
 
 
@@ -9,4 +8,4 @@ class DocumentRelevance(BaseModel):
 
 class RankedDocuments(BaseModel):
     query: str
-    documents: List[DocumentRelevance]
+    documents: list[DocumentRelevance]

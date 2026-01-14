@@ -1,13 +1,22 @@
-from langchain_core.messages import HumanMessage
-from langchain_ollama import ChatOllama
 import base64
-from PIL import Image
 import io
+
+from langchain_core.messages import HumanMessage
+from PIL import Image
+
+from src.infrastructure.adapters.ollama_adapter import OllamaAdapter
 
 
 class ImageCaptioningService:
-    def __init__(self, model: str, base_url: str, min_width: int = 100, min_height: int = 100):
-        self.llm = ChatOllama(model=model, base_url=base_url)
+    """Service for generating image descriptions using vision LLM."""
+
+    def __init__(
+        self,
+        ollama_adapter: OllamaAdapter,
+        min_width: int = 100,
+        min_height: int = 100,
+    ):
+        self.llm = ollama_adapter.get_image_captioning_model()
         self.min_width = min_width
         self.min_height = min_height
 
@@ -26,7 +35,7 @@ class ImageCaptioningService:
             return None
 
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-        new_prompt = """You are an expert at describing images for a Retrieval-Augmented Generation (RAG) system. Your task is to generate a detailed, factual, and descriptive summary of the following image. This summary will be stored in a vector database and used to find the image based on user queries.
+        prompt = """You are an expert at describing images for a Retrieval-Augmented Generation (RAG) system. Your task is to generate a detailed, factual, and descriptive summary of the following image. This summary will be stored in a vector database and used to find the image based on user queries.
 
 Please include the following in your description:
 -   **Key Objects:** Identify all important objects in the image.
@@ -35,9 +44,10 @@ Please include the following in your description:
 -   **Attributes:** Mention colors, shapes, and other important visual attributes.
 
 The goal is to create a rich description that will maximize the chances of this image being retrieved for relevant queries. Be objective and stick to what is visually present in the image."""
+
         message = HumanMessage(
             content=[
-                {"type": "text", "text": new_prompt},
+                {"type": "text", "text": prompt},
                 {
                     "type": "image",
                     "source_type": "base64",

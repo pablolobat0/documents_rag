@@ -4,10 +4,9 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
     gcc \
-    libpq-dev 
+    libpq-dev
 
-
-RUN pip install uv 
+RUN pip install uv
 
 COPY pyproject.toml uv.lock ./
 
@@ -15,7 +14,7 @@ RUN uv sync
 
 COPY . .
 
-EXPOSE 8000
+EXPOSE 8501
 
-CMD ["uv", "run", "fastapi", "dev", "--host", "0.0.0.0"]
+CMD ["uv", "run", "streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
