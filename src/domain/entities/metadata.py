@@ -1,9 +1,8 @@
-from dataclasses import dataclass, field
 from datetime import datetime
+from pydantic import BaseModel, Field
 
 
-@dataclass
-class Metadata:
+class Metadata(BaseModel):
     """Base metadata for documents."""
 
     pages: int
@@ -15,7 +14,6 @@ class Metadata:
     processed_at: datetime | None = None
 
 
-@dataclass
 class CurriculumVitae(Metadata):
     """Metadata for CV/Resume documents."""
 
@@ -23,12 +21,12 @@ class CurriculumVitae(Metadata):
     email: str | None = None
     phone_number: str | None = None
     linkedin_profile: str | None = None
-    skills: list[str] = field(default_factory=list)
-    experience: list[str] = field(default_factory=list)
-    education: list[str] = field(default_factory=list)
+    # In Pydantic, use Field(default_factory=list) for mutable defaults
+    skills: list[str] = Field(default_factory=list)
+    experience: list[str] = Field(default_factory=list)
+    education: list[str] = Field(default_factory=list)
 
 
-@dataclass
 class Receipt(Metadata):
     """Metadata for receipt documents."""
 
@@ -37,4 +35,4 @@ class Receipt(Metadata):
     transaction_date: str | None = None
     transaction_time: str | None = None
     total_amount: float | None = None
-    items: list[str] = field(default_factory=list)
+    items: list[str] = Field(default_factory=list)
