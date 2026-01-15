@@ -1,50 +1,48 @@
 import re
 
 from langchain.tools import Tool
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from src.infrastructure.adapters.ollama_adapter import OllamaAdapter
-from src.infrastructure.adapters.qdrant_adapter import QdrantAdapter
-from src.infrastructure.adapters.redis_adapter import RedisAdapter
-from src.infrastructure.rag.prompts import (
+from src.domain.value_objects.chat_message import ChatMessage
+from src.infrastructure.agent.prompts import (
     GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT,
     RERANK_SYSTEM_PROMPT,
 )
-from src.infrastructure.rag.schemas import RankedDocuments
+from src.infrastructure.agent.schemas import RankedDocuments
+from src.infrastructure.llm.ollama import OllamaLLM
+from src.infrastructure.storage.qdrant import QdrantVectorStore
+from src.infrastructure.storage.redis import RedisCheckpoint
 
 
-class Agent:
-    """LangGraph-based RAG Agent with dependency injection."""
+class LanggraphAgent:
+    """LangGraph-based RAG Agent. Implements AgentPort."""
 
     def __init__(
         self,
-        ollama_adapter: OllamaAdapter,
-        qdrant_adapter: QdrantAdapter,
-        redis_adapter: RedisAdapter,
+        ollama: OllamaLLM,
+        qdrant: QdrantVectorStore,
+        redis: RedisCheckpoint,
     ) -> None:
-        self.ollama_adapter = ollama_adapter
-        self.qdrant_adapter = qdrant_adapter
-        self.redis_adapter = redis_adapter
+        self.ollama = ollama
+        self.qdrant = qdrant
+        self.redis = redis
 
-        self.llm = ollama_adapter.get_chat_model()
-        self.retriever = qdrant_adapter.get_retriever(search_type="mmr", k=10)
-        self.vector_store = qdrant_adapter.get_vector_store()
-        checkpointer = redis_adapter.get_checkpointer()
+        self._llm = ollama.get_chat_model()
+        self._retriever = qdrant.get_retriever(search_type="mmr", k=10)
+        checkpointer = redis.get_checkpointer()
 
-        # Create custom tool with retrieval
         retriever_tool = Tool(
             name="search_documents",
             description="Searches through uploaded documents to find relevant information based on a query. Returns document snippets that can be used to answer user questions.",
-            func=self.retrieve_documents,
+            func=self._retrieve_documents,
         )
 
-        self.tools = [retriever_tool]
+        self._tools = [retriever_tool]
 
-        # Build simplified graph without summarization
         builder = StateGraph(MessagesState)
-        builder.add_node("generate_query_or_respond", self.generate_query_or_respond)
+        builder.add_node("generate_query_or_respond", self._generate_query_or_respond)
         builder.add_node("retrieve", ToolNode([retriever_tool]))
 
         builder.add_edge(START, "generate_query_or_respond")
@@ -58,19 +56,26 @@ class Agent:
         )
         builder.add_edge("retrieve", "generate_query_or_respond")
 
-        self.graph = builder.compile(checkpointer=checkpointer)
+        self._graph = builder.compile(checkpointer=checkpointer)
 
-    def generate_query_or_respond(self, state: MessagesState):
+    def _convert_messages(self, messages: list[ChatMessage]) -> list:
+        """Convert domain ChatMessage to LangChain message types."""
+        langchain_messages = []
+        for msg in messages:
+            if msg.role == "user":
+                langchain_messages.append(HumanMessage(content=msg.content))
+            elif msg.role == "assistant":
+                langchain_messages.append(AIMessage(content=msg.content))
+        return langchain_messages
+
+    def _generate_query_or_respond(self, state: MessagesState):
         messages = state["messages"]
         system_prompt = GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 
-        # Build messages with system prompt
         llm_messages = [SystemMessage(content=system_prompt)] + list(messages)
 
-        # Invoke LLM with tools bound
-        response = self.llm.bind_tools(self.tools).invoke(llm_messages)
+        response = self._llm.bind_tools(self._tools).invoke(llm_messages)
 
-        # Remove thinking tags from response
         if isinstance(response, AIMessage):
             cleaned_content = re.sub(
                 r"<think>.*?</think>", "", str(response.content), flags=re.DOTALL
@@ -86,17 +91,17 @@ class Agent:
 
         return {"messages": [response]}
 
-    def retrieve_documents(self, query: str) -> list[str]:
+    def _retrieve_documents(self, query: str) -> list[str]:
         """Search documents and return relevant snippets based on the query."""
         try:
-            retrieved_docs = self.retriever.invoke(query)
+            retrieved_docs = self._retriever.invoke(query)
 
             if not retrieved_docs:
                 return []
 
             documents_content = [doc.page_content for doc in retrieved_docs]
 
-            structured_llm = self.llm.with_structured_output(RankedDocuments)
+            structured_llm = self._llm.with_structured_output(RankedDocuments)
 
             formatted_docs = "\n\n".join(
                 [
@@ -122,8 +127,11 @@ class Agent:
         except Exception as e:
             return [f"Error during retrieval and re-ranking: {e}"]
 
-    def run(self, conversation: dict, session_id: str) -> str:
-        """Run the agent with a conversation and session ID."""
-        return self.graph.invoke(
-            conversation, {"configurable": {"thread_id": session_id}}
-        )["messages"][-1].content
+    def run(self, messages: list[ChatMessage], session_id: str) -> str:
+        """Run the agent with conversation messages and session ID."""
+        langchain_messages = self._convert_messages(messages)
+        result = self._graph.invoke(
+            {"messages": langchain_messages},
+            {"configurable": {"thread_id": session_id}},
+        )
+        return result["messages"][-1].content

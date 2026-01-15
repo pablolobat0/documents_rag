@@ -10,3 +10,4 @@ wheels/
 .venv
 .env
 document_metadata/
+CLAUDE.md

@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Union
@@ -6,14 +7,14 @@ from typing import Union
 from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
 
 
-class FilesystemAdapter:
-    """Adapter for JSON-based metadata storage."""
+class FilesystemStorage:
+    """Filesystem metadata storage implementation. Implements MetadataStoragePort."""
 
     def __init__(self, storage_dir: str = "document_metadata"):
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-    def generate_filename(
+    def _generate_filename(
         self, document_name: str | None, file_type: str | None
     ) -> str:
         """Generate a unique filename for the metadata JSON file."""
@@ -31,15 +32,13 @@ class FilesystemAdapter:
         """Save metadata to a JSON file and return the file path."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-        metadata_dict = metadata.model_dump()
+        metadata_dict = asdict(metadata)
 
-        # Handle datetime serialization
         if metadata_dict.get("created_at"):
             metadata_dict["created_at"] = metadata_dict["created_at"].isoformat()
         if metadata_dict.get("processed_at"):
             metadata_dict["processed_at"] = metadata_dict["processed_at"].isoformat()
 
-        # Add document type field
         if isinstance(metadata, CurriculumVitae):
             metadata_dict["document_type"] = "cv"
         elif isinstance(metadata, Receipt):
@@ -47,7 +46,7 @@ class FilesystemAdapter:
         else:
             metadata_dict["document_type"] = "unknown"
 
-        filename = self.generate_filename(
+        filename = self._generate_filename(
             metadata_dict.get("document_name"), metadata_dict.get("file_type")
         )
         file_path = self.storage_dir / filename
@@ -75,7 +74,7 @@ class FilesystemAdapter:
             if data.get("processed_at"):
                 data["processed_at"] = datetime.fromisoformat(data["processed_at"])
 
-            document_type = data.get("document_type", "unknown")
+            document_type = data.pop("document_type", "unknown")
 
             if document_type == "cv":
                 return CurriculumVitae(**data)

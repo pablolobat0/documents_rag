@@ -2,14 +2,14 @@ import io
 
 import pypdf
 
-from src.infrastructure.services.image_captioning import ImageCaptioningService
+from src.infrastructure.processing.image_captioner import OllamaImageCaptioner
 
 
-class PdfProcessor:
-    """Service for extracting text and images from PDF documents."""
+class PypdfProcessor:
+    """PyPDF-based PDF processor implementation. Implements PdfProcessorPort."""
 
-    def __init__(self, image_captioning_service: ImageCaptioningService):
-        self.image_captioning_service = image_captioning_service
+    def __init__(self, image_captioner: OllamaImageCaptioner):
+        self.image_captioner = image_captioner
 
     def extract_content(self, file_content: bytes) -> tuple[list[str], int]:
         """
@@ -38,13 +38,10 @@ class PdfProcessor:
                     if text.strip():
                         documents.append(text)
 
-                    # Process images in the page
                     for image in page.images:
                         try:
-                            image_summary = (
-                                self.image_captioning_service.get_image_summary(
-                                    image.data
-                                )
+                            image_summary = self.image_captioner.get_image_summary(
+                                image.data
                             )
                             if image_summary is not None:
                                 documents.append(image_summary)

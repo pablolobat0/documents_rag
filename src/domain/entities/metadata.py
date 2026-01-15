@@ -1,73 +1,40 @@
-import datetime
-from typing import Literal
-
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
+from datetime import datetime
 
 
-class Metadata(BaseModel):
+@dataclass
+class Metadata:
+    """Base metadata for documents."""
+
     pages: int
-    document_name: str | None = Field(
-        default=None, description="The name of the document file."
-    )
-    file_path: str | None = Field(
-        default=None, description="The path to the document file."
-    )
-    file_size: int | None = Field(
-        default=None, description="The size of the document file in bytes."
-    )
-    file_type: str | None = Field(
-        default=None, description="The MIME type or file extension."
-    )
-    created_at: datetime.datetime | None = Field(
-        default=None, description="When the document was created."
-    )
-    processed_at: datetime.datetime | None = Field(
-        default=None, description="When the document was processed."
-    )
+    document_name: str | None = None
+    file_path: str | None = None
+    file_size: int | None = None
+    file_type: str | None = None
+    created_at: datetime | None = None
+    processed_at: datetime | None = None
 
 
+@dataclass
 class CurriculumVitae(Metadata):
-    name: str | None = Field(default=None, description="The name of the person.")
-    email: str | None = Field(
-        default=None, description="The email address of the person."
-    )
-    phone_number: str | None = Field(
-        default=None, description="The phone number of the person."
-    )
-    linkedin_profile: str | None = Field(
-        default=None, description="The URL of the person's LinkedIn profile."
-    )
-    skills: list[str] = Field(default_factory=list, description="A list of skills.")
-    experience: list[str] = Field(
-        default_factory=list, description="A list of work experiences."
-    )
-    education: list[str] = Field(
-        default_factory=list, description="A list of educational qualifications."
-    )
+    """Metadata for CV/Resume documents."""
+
+    name: str | None = None
+    email: str | None = None
+    phone_number: str | None = None
+    linkedin_profile: str | None = None
+    skills: list[str] = field(default_factory=list)
+    experience: list[str] = field(default_factory=list)
+    education: list[str] = field(default_factory=list)
 
 
+@dataclass
 class Receipt(Metadata):
-    merchant_name: str | None = Field(
-        default=None, description="The name of the merchant."
-    )
-    merchant_address: str | None = Field(
-        default=None, description="The address of the merchant."
-    )
-    transaction_date: str | None = Field(
-        default=None, description="The date of the transaction."
-    )
-    transaction_time: str | None = Field(
-        default=None, description="The time of the transaction."
-    )
-    total_amount: float | None = Field(
-        default=None, description="The total amount of the transaction."
-    )
-    items: list[str] = Field(
-        default_factory=list, description="A list of items purchased."
-    )
+    """Metadata for receipt documents."""
 
-
-class DocumentClassification(BaseModel):
-    document_type: Literal["receipt", "cv", "none"] = Field(
-        description="The type of the document (e.g., 'receipt', 'cv', 'none')."
-    )
+    merchant_name: str | None = None
+    merchant_address: str | None = None
+    transaction_date: str | None = None
+    transaction_time: str | None = None
+    total_amount: float | None = None
+    items: list[str] = field(default_factory=list)

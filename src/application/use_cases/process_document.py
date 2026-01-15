@@ -1,21 +1,14 @@
 from datetime import datetime
 from typing import Union
 
-from langchain_core.language_models import BaseChatModel
-
 from src.application.dto.upload_dto import ProcessDocumentRequest, ProcessDocumentResponse
-from src.domain.entities.metadata import (
-    CurriculumVitae,
-    DocumentClassification,
-    Metadata,
-    Receipt,
-)
-from src.domain.services.document_classifier import DocumentClassifier, DocumentType
-from src.domain.services.text_splitter import TextSplitter
-from src.infrastructure.adapters.filesystem_adapter import FilesystemAdapter
-from src.infrastructure.adapters.ollama_adapter import OllamaAdapter
-from src.infrastructure.adapters.qdrant_adapter import QdrantAdapter
-from src.infrastructure.services.pdf_processor import PdfProcessor
+from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
+from src.domain.ports.document_classifier_port import DocumentClassifierPort, DocumentType
+from src.domain.ports.llm_port import EmbeddingsPort, LLMPort
+from src.domain.ports.metadata_storage_port import MetadataStoragePort
+from src.domain.ports.pdf_processor_port import PdfProcessorPort
+from src.domain.ports.text_splitter_port import TextSplitterPort
+from src.domain.ports.vector_store_port import VectorStorePort
 
 
 class ProcessDocumentUseCase:
@@ -23,29 +16,28 @@ class ProcessDocumentUseCase:
 
     def __init__(
         self,
-        ollama_adapter: OllamaAdapter,
-        qdrant_adapter: QdrantAdapter,
-        pdf_processor: PdfProcessor,
-        filesystem_adapter: FilesystemAdapter,
-        text_splitter: TextSplitter,
-        document_classifier: DocumentClassifier,
+        llm: LLMPort,
+        embeddings: EmbeddingsPort,
+        vector_store: VectorStorePort,
+        pdf_processor: PdfProcessorPort,
+        metadata_storage: MetadataStoragePort,
+        text_splitter: TextSplitterPort,
+        document_classifier: DocumentClassifierPort,
     ):
-        self.ollama_adapter = ollama_adapter
-        self.qdrant_adapter = qdrant_adapter
-        self.pdf_processor = pdf_processor
-        self.filesystem_adapter = filesystem_adapter
-        self.text_splitter = text_splitter
-        self.document_classifier = document_classifier
-        self.llm = ollama_adapter.get_chat_model()
+        self._llm = llm
+        self._embeddings = embeddings
+        self._vector_store = vector_store
+        self._pdf_processor = pdf_processor
+        self._metadata_storage = metadata_storage
+        self._text_splitter = text_splitter
+        self._document_classifier = document_classifier
 
     def execute(self, request: ProcessDocumentRequest) -> ProcessDocumentResponse:
         """Process a document and store it in the vector database."""
         try:
-            # Extract content based on file type
             if request.content_type == "application/pdf":
-                documents, pages = self.pdf_processor.extract_content(request.content)
+                documents, pages = self._pdf_processor.extract_content(request.content)
             else:
-                # Text file
                 content = request.content.decode("utf-8")
                 documents = [content]
                 pages = 1
@@ -58,7 +50,6 @@ class ProcessDocumentUseCase:
                     message="No content found in document",
                 )
 
-            # Create base metadata
             base_metadata = Metadata(
                 pages=pages,
                 document_name=request.filename,
@@ -68,12 +59,10 @@ class ProcessDocumentUseCase:
                 processed_at=datetime.now(),
             )
 
-            # Classify document and extract metadata
             full_text = "\n".join(documents)
             extracted_metadata = self._extract_metadata(full_text, base_metadata)
 
-            # Split into chunks
-            chunks = self.text_splitter.split(full_text)
+            chunks = self._text_splitter.split(full_text)
 
             if not chunks:
                 return ProcessDocumentResponse(
@@ -83,15 +72,12 @@ class ProcessDocumentUseCase:
                     message="No chunks created from document",
                 )
 
-            # Generate embeddings
-            embeddings = self.ollama_adapter.embed_documents(chunks)
+            embeddings = self._embeddings.embed_documents(chunks)
 
-            # Store in vector database
-            self.qdrant_adapter.upsert(chunks, embeddings)
+            self._vector_store.upsert(chunks, embeddings)
 
-            # Save metadata to filesystem
             try:
-                self.filesystem_adapter.save_metadata(extracted_metadata)
+                self._metadata_storage.save_metadata(extracted_metadata)
             except Exception as e:
                 print(f"Warning: Failed to save metadata: {e}")
 
@@ -114,10 +100,9 @@ class ProcessDocumentUseCase:
         self, document: str, base_metadata: Metadata
     ) -> Union[Metadata, CurriculumVitae, Receipt]:
         """Extract metadata using classification and LLM."""
-        doc_type, cv_score, receipt_score = self.document_classifier.classify(document)
+        doc_type, cv_score, receipt_score = self._document_classifier.classify(document)
 
         if doc_type == DocumentType.UNKNOWN:
-            # Use LLM for classification
             return self._classify_with_llm(document, base_metadata)
         elif doc_type == DocumentType.CV:
             return self._extract_cv_metadata(document, base_metadata)
@@ -128,7 +113,7 @@ class ProcessDocumentUseCase:
         self, document: str, base_metadata: Metadata
     ) -> Union[Metadata, CurriculumVitae, Receipt]:
         """Use LLM to classify document when keyword scoring is inconclusive."""
-        structured_llm = self.llm.with_structured_output(DocumentClassification)
+        from src.domain.entities.classification import DocumentClassification
 
         classification_prompt = f"""
         Classify this document as either 'cv' (curriculum vitae/resume), 'receipt', or 'none'.
@@ -137,7 +122,10 @@ class ProcessDocumentUseCase:
         """
 
         try:
-            result = structured_llm.invoke(classification_prompt)
+            result = self._llm.invoke_structured(
+                [{"role": "user", "content": classification_prompt}],
+                DocumentClassification,
+            )
 
             if result.document_type == "cv":
                 return self._extract_cv_metadata(document, base_metadata)
@@ -153,27 +141,35 @@ class ProcessDocumentUseCase:
         self, document: str, base_metadata: Metadata
     ) -> CurriculumVitae:
         """Extract CV metadata using LLM."""
-        structured_llm = self.llm.with_structured_output(CurriculumVitae)
-
         cv_prompt = f"""
         Extract the following information from this CV/resume text:
 
         Text: {document}
 
         Extract the person's name, email, phone number, LinkedIn profile, skills, work experience, and education.
-        Return the data according to the CurriculumVitae schema.
         """
 
         try:
-            result = structured_llm.invoke(cv_prompt)
-            result.document_name = base_metadata.document_name
-            result.file_path = base_metadata.file_path
-            result.file_size = base_metadata.file_size
-            result.file_type = base_metadata.file_type
-            result.created_at = base_metadata.created_at
-            result.processed_at = base_metadata.processed_at
-            result.pages = base_metadata.pages
-            return result
+            result = self._llm.invoke_structured(
+                [{"role": "user", "content": cv_prompt}],
+                CurriculumVitae,
+            )
+            return CurriculumVitae(
+                pages=base_metadata.pages,
+                document_name=base_metadata.document_name,
+                file_path=base_metadata.file_path,
+                file_size=base_metadata.file_size,
+                file_type=base_metadata.file_type,
+                created_at=base_metadata.created_at,
+                processed_at=base_metadata.processed_at,
+                name=getattr(result, 'name', None),
+                email=getattr(result, 'email', None),
+                phone_number=getattr(result, 'phone_number', None),
+                linkedin_profile=getattr(result, 'linkedin_profile', None),
+                skills=getattr(result, 'skills', []),
+                experience=getattr(result, 'experience', []),
+                education=getattr(result, 'education', []),
+            )
         except Exception:
             return CurriculumVitae(
                 pages=base_metadata.pages,
@@ -183,40 +179,40 @@ class ProcessDocumentUseCase:
                 file_type=base_metadata.file_type,
                 created_at=base_metadata.created_at,
                 processed_at=base_metadata.processed_at,
-                name=None,
-                email=None,
-                phone_number=None,
-                linkedin_profile=None,
-                skills=[],
-                experience=[],
-                education=[],
             )
 
     def _extract_receipt_metadata(
         self, document: str, base_metadata: Metadata
     ) -> Receipt:
         """Extract receipt metadata using LLM."""
-        structured_llm = self.llm.with_structured_output(Receipt)
-
         receipt_prompt = f"""
         Extract the following information from this receipt text:
 
         Text: {document}
 
         Extract the merchant name, address, transaction date/time, total amount, and items purchased.
-        Return the data according to the Receipt schema.
         """
 
         try:
-            result = structured_llm.invoke(receipt_prompt)
-            result.document_name = base_metadata.document_name
-            result.file_path = base_metadata.file_path
-            result.file_size = base_metadata.file_size
-            result.file_type = base_metadata.file_type
-            result.created_at = base_metadata.created_at
-            result.processed_at = base_metadata.processed_at
-            result.pages = base_metadata.pages
-            return result
+            result = self._llm.invoke_structured(
+                [{"role": "user", "content": receipt_prompt}],
+                Receipt,
+            )
+            return Receipt(
+                pages=base_metadata.pages,
+                document_name=base_metadata.document_name,
+                file_path=base_metadata.file_path,
+                file_size=base_metadata.file_size,
+                file_type=base_metadata.file_type,
+                created_at=base_metadata.created_at,
+                processed_at=base_metadata.processed_at,
+                merchant_name=getattr(result, 'merchant_name', None),
+                merchant_address=getattr(result, 'merchant_address', None),
+                transaction_date=getattr(result, 'transaction_date', None),
+                transaction_time=getattr(result, 'transaction_time', None),
+                total_amount=getattr(result, 'total_amount', None),
+                items=getattr(result, 'items', []),
+            )
         except Exception:
             return Receipt(
                 pages=base_metadata.pages,
@@ -226,10 +222,4 @@ class ProcessDocumentUseCase:
                 file_type=base_metadata.file_type,
                 created_at=base_metadata.created_at,
                 processed_at=base_metadata.processed_at,
-                merchant_name=None,
-                merchant_address=None,
-                transaction_date=None,
-                transaction_time=None,
-                total_amount=None,
-                items=[],
             )

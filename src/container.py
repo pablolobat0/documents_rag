@@ -3,23 +3,23 @@ from functools import cached_property
 from config.settings import settings
 from src.application.use_cases.chat_with_documents import ChatWithDocumentsUseCase
 from src.application.use_cases.process_document import ProcessDocumentUseCase
-from src.domain.services.document_classifier import DocumentClassifier
-from src.domain.services.text_splitter import TextSplitter
-from src.infrastructure.adapters.filesystem_adapter import FilesystemAdapter
-from src.infrastructure.adapters.ollama_adapter import OllamaAdapter
-from src.infrastructure.adapters.qdrant_adapter import QdrantAdapter
-from src.infrastructure.adapters.redis_adapter import RedisAdapter
-from src.infrastructure.rag.agent import Agent
-from src.infrastructure.services.image_captioning import ImageCaptioningService
-from src.infrastructure.services.pdf_processor import PdfProcessor
+from src.infrastructure.agent.langgraph import LanggraphAgent
+from src.infrastructure.llm.ollama import OllamaLLM
+from src.infrastructure.processing.document_classifier import KeywordClassifier
+from src.infrastructure.processing.image_captioner import OllamaImageCaptioner
+from src.infrastructure.processing.pdf_processor import PypdfProcessor
+from src.infrastructure.processing.text_splitter import LangchainTextSplitter
+from src.infrastructure.storage.filesystem import FilesystemStorage
+from src.infrastructure.storage.qdrant import QdrantVectorStore
+from src.infrastructure.storage.redis import RedisCheckpoint
 
 
 class Container:
     """Dependency injection container using cached_property for lazy singletons."""
 
     @cached_property
-    def ollama_adapter(self) -> OllamaAdapter:
-        return OllamaAdapter(
+    def ollama(self) -> OllamaLLM:
+        return OllamaLLM(
             base_url=settings.ollama_url,
             chat_model=settings.model,
             embeddings_model=settings.embeddings_model,
@@ -28,50 +28,50 @@ class Container:
         )
 
     @cached_property
-    def qdrant_adapter(self) -> QdrantAdapter:
-        return QdrantAdapter(
+    def qdrant(self) -> QdrantVectorStore:
+        return QdrantVectorStore(
             url=settings.qdrant_url,
             collection_name=settings.qdrant_collection_name,
-            ollama_adapter=self.ollama_adapter,
+            ollama=self.ollama,
         )
 
     @cached_property
-    def redis_adapter(self) -> RedisAdapter:
-        return RedisAdapter(redis_url=settings.redis_url)
+    def redis(self) -> RedisCheckpoint:
+        return RedisCheckpoint(redis_url=settings.redis_url)
 
     @cached_property
-    def filesystem_adapter(self) -> FilesystemAdapter:
-        return FilesystemAdapter(storage_dir="document_metadata")
+    def filesystem(self) -> FilesystemStorage:
+        return FilesystemStorage(storage_dir="document_metadata")
 
     @cached_property
-    def image_captioning_service(self) -> ImageCaptioningService:
-        return ImageCaptioningService(
-            ollama_adapter=self.ollama_adapter,
+    def image_captioner(self) -> OllamaImageCaptioner:
+        return OllamaImageCaptioner(
+            ollama=self.ollama,
             min_width=settings.min_image_width,
             min_height=settings.min_image_height,
         )
 
     @cached_property
-    def pdf_processor(self) -> PdfProcessor:
-        return PdfProcessor(image_captioning_service=self.image_captioning_service)
+    def pdf_processor(self) -> PypdfProcessor:
+        return PypdfProcessor(image_captioner=self.image_captioner)
 
     @cached_property
-    def document_classifier(self) -> DocumentClassifier:
-        return DocumentClassifier()
+    def document_classifier(self) -> KeywordClassifier:
+        return KeywordClassifier()
 
     @cached_property
-    def text_splitter(self) -> TextSplitter:
-        return TextSplitter(
+    def text_splitter(self) -> LangchainTextSplitter:
+        return LangchainTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
         )
 
     @cached_property
-    def agent(self) -> Agent:
-        return Agent(
-            ollama_adapter=self.ollama_adapter,
-            qdrant_adapter=self.qdrant_adapter,
-            redis_adapter=self.redis_adapter,
+    def agent(self) -> LanggraphAgent:
+        return LanggraphAgent(
+            ollama=self.ollama,
+            qdrant=self.qdrant,
+            redis=self.redis,
         )
 
     @cached_property
@@ -81,16 +81,16 @@ class Container:
     @cached_property
     def process_document_use_case(self) -> ProcessDocumentUseCase:
         return ProcessDocumentUseCase(
-            ollama_adapter=self.ollama_adapter,
-            qdrant_adapter=self.qdrant_adapter,
+            llm=self.ollama,
+            embeddings=self.ollama,
+            vector_store=self.qdrant,
             pdf_processor=self.pdf_processor,
-            filesystem_adapter=self.filesystem_adapter,
+            metadata_storage=self.filesystem,
             text_splitter=self.text_splitter,
             document_classifier=self.document_classifier,
         )
 
 
-# Global container instance
 _container: Container | None = None
 
 

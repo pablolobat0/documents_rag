@@ -4,19 +4,19 @@ import io
 from langchain_core.messages import HumanMessage
 from PIL import Image
 
-from src.infrastructure.adapters.ollama_adapter import OllamaAdapter
+from src.infrastructure.llm.ollama import OllamaLLM
 
 
-class ImageCaptioningService:
-    """Service for generating image descriptions using vision LLM."""
+class OllamaImageCaptioner:
+    """Ollama-based image captioning implementation."""
 
     def __init__(
         self,
-        ollama_adapter: OllamaAdapter,
+        ollama: OllamaLLM,
         min_width: int = 100,
         min_height: int = 100,
     ):
-        self.llm = ollama_adapter.get_image_captioning_model()
+        self._llm = ollama.get_image_captioning_model()
         self.min_width = min_width
         self.min_height = min_height
 
@@ -56,4 +56,4 @@ The goal is to create a rich description that will maximize the chances of this 
                 },
             ],
         )
-        return self.llm.invoke([message]).content
+        return self._llm.invoke([message]).content

@@ -1,12 +1,6 @@
 import re
-from enum import Enum
 
-
-class DocumentType(Enum):
-    CV = "cv"
-    RECEIPT = "receipt"
-    UNKNOWN = "unknown"
-
+from src.domain.ports.document_classifier_port import DocumentType
 
 CV_THRESHOLD = 8.0
 RECEIPT_THRESHOLD = 8.0
@@ -94,11 +88,11 @@ RECEIPT_KEYWORDS = {
 }
 
 
-class DocumentClassifier:
-    """Domain service for document classification using keyword scoring."""
+class KeywordClassifier:
+    """Keyword-based document classifier implementation. Implements DocumentClassifierPort."""
 
-    def calculate_cv_score(self, text: str) -> float:
-        """Calculates a CV score based on weighted keyword matches."""
+    def _calculate_cv_score(self, text: str) -> float:
+        """Calculate CV score based on weighted keyword matches."""
         text_lower = text.lower()
         total_score = 0.0
 
@@ -108,8 +102,8 @@ class DocumentClassifier:
 
         return total_score
 
-    def calculate_receipt_score(self, text: str) -> float:
-        """Calculates a receipt score based on weighted keyword matches."""
+    def _calculate_receipt_score(self, text: str) -> float:
+        """Calculate receipt score based on weighted keyword matches."""
         text_lower = text.lower()
         total_score = 0.0
 
@@ -121,13 +115,13 @@ class DocumentClassifier:
 
     def classify(self, text: str) -> tuple[DocumentType, float, float]:
         """
-        Classifies a document based on keyword scoring.
+        Classify a document based on keyword scoring.
 
         Returns:
             Tuple of (document_type, cv_score, receipt_score)
         """
-        cv_score = self.calculate_cv_score(text)
-        receipt_score = self.calculate_receipt_score(text)
+        cv_score = self._calculate_cv_score(text)
+        receipt_score = self._calculate_receipt_score(text)
 
         if cv_score < CV_THRESHOLD and receipt_score < RECEIPT_THRESHOLD:
             return DocumentType.UNKNOWN, cv_score, receipt_score
@@ -139,6 +133,6 @@ class DocumentClassifier:
 
     def needs_llm_classification(self, text: str) -> bool:
         """Returns True if keyword scoring is inconclusive and LLM should be used."""
-        cv_score = self.calculate_cv_score(text)
-        receipt_score = self.calculate_receipt_score(text)
+        cv_score = self._calculate_cv_score(text)
+        receipt_score = self._calculate_receipt_score(text)
         return cv_score < CV_THRESHOLD and receipt_score < RECEIPT_THRESHOLD

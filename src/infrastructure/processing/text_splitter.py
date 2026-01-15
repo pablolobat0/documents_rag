@@ -1,18 +1,16 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from config.settings import settings
 
-
-class TextSplitter:
-    """Domain service for splitting text into chunks."""
+class LangchainTextSplitter:
+    """LangChain text splitter implementation. Implements TextSplitterPort."""
 
     def __init__(
         self,
-        chunk_size: int | None = None,
-        chunk_overlap: int | None = None,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
     ):
-        self.chunk_size = chunk_size or settings.chunk_size
-        self.chunk_overlap = chunk_overlap or settings.chunk_overlap
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
