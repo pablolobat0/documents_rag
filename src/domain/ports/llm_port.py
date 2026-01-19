@@ -1,21 +1,15 @@
-from typing import Any, Protocol, Union
-
-from src.domain.value_objects.chat_message import ChatMessage
+from typing import Any, Protocol
 
 
 class LLMPort(Protocol):
     """Port for LLM operations."""
 
-    def invoke(self, messages: list[ChatMessage]) -> str:
-        """Invoke LLM with conversation messages and return response content."""
+    def invoke(self, input: Any) -> Any:
+        """Invoke LLM with input and return response."""
         ...
 
-    def invoke_structured(
-        self,
-        messages: Union[list[ChatMessage], list[dict]],
-        schema: type,
-    ) -> Any:
-        """Invoke LLM with messages and parse response into structured schema."""
+    def with_structured_output(self, schema: type) -> Any:
+        """Return a runnable that outputs structured data matching the schema."""
         ...
 
 

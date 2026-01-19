@@ -1,19 +1,16 @@
 import re
 
 from langchain.tools import Tool
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.checkpoint.redis import RedisSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from src.domain.ports.vector_store_port import VectorStorePort
 from src.domain.value_objects.chat_message import ChatMessage
-from src.infrastructure.agent.prompts import (
-    GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT,
-    RERANK_SYSTEM_PROMPT,
-)
+from src.domain.prompts.agent import AgentPrompts
 from src.infrastructure.agent.schemas import RankedDocuments
-from src.infrastructure.llm.ollama import OllamaLLM
-from src.infrastructure.storage.qdrant import QdrantVectorStore
-from src.infrastructure.storage.redis import RedisCheckpoint
 
 
 class LanggraphAgent:
@@ -21,17 +18,13 @@ class LanggraphAgent:
 
     def __init__(
         self,
-        ollama: OllamaLLM,
-        qdrant: QdrantVectorStore,
-        redis: RedisCheckpoint,
+        llm: BaseChatModel,
+        vector_store: VectorStorePort,
+        redis_url: str,
     ) -> None:
-        self.ollama = ollama
-        self.qdrant = qdrant
-        self.redis = redis
-
-        self._llm = ollama.get_chat_model()
-        self._retriever = qdrant.get_retriever(search_type="mmr", k=10)
-        checkpointer = redis.get_checkpointer()
+        self._llm = llm
+        self.vector_store = vector_store
+        checkpointer = RedisSaver(redis_url)
 
         retriever_tool = Tool(
             name="search_documents",
@@ -70,7 +63,7 @@ class LanggraphAgent:
 
     def _generate_query_or_respond(self, state: MessagesState):
         messages = state["messages"]
-        system_prompt = GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
+        system_prompt = AgentPrompts.GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 
         llm_messages = [SystemMessage(content=system_prompt)] + list(messages)
 
@@ -94,7 +87,7 @@ class LanggraphAgent:
     def _retrieve_documents(self, query: str) -> list[str]:
         """Search documents and return relevant snippets based on the query."""
         try:
-            retrieved_docs = self._retriever.invoke(query)
+            retrieved_docs = self.vector_store.search(query)
 
             if not retrieved_docs:
                 return []
@@ -110,7 +103,7 @@ class LanggraphAgent:
                 ]
             )
 
-            rerank_prompt = f"{RERANK_SYSTEM_PROMPT}\n\nQuery: {query}\n\nRetrieved Documents:\n{formatted_docs}"
+            rerank_prompt = f"{AgentPrompts.RERANK_SYSTEM_PROMPT}\n\nQuery: {query}\n\nRetrieved Documents:\n{formatted_docs}"
 
             result = structured_llm.invoke([SystemMessage(content=rerank_prompt)])
 

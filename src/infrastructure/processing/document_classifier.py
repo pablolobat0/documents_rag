@@ -1,6 +1,9 @@
 import re
 
+from src.domain.entities.classification import DocumentClassification
 from src.domain.ports.document_classifier_port import DocumentType
+from src.domain.ports.llm_port import LLMPort
+from src.domain.prompts.document_processing import DocumentPrompts
 
 CV_THRESHOLD = 8.0
 RECEIPT_THRESHOLD = 8.0
@@ -89,7 +92,10 @@ RECEIPT_KEYWORDS = {
 
 
 class KeywordClassifier:
-    """Keyword-based document classifier implementation. Implements DocumentClassifierPort."""
+    """Document classifier with keyword scoring and LLM fallback."""
+
+    def __init__(self, llm: LLMPort):
+        self._llm = llm
 
     def _calculate_cv_score(self, text: str) -> float:
         """Calculate CV score based on weighted keyword matches."""
@@ -113,26 +119,33 @@ class KeywordClassifier:
 
         return total_score
 
-    def classify(self, text: str) -> tuple[DocumentType, float, float]:
-        """
-        Classify a document based on keyword scoring.
-
-        Returns:
-            Tuple of (document_type, cv_score, receipt_score)
-        """
+    def classify(self, text: str) -> DocumentType:
+        """Classify a document using keyword scoring with LLM fallback."""
         cv_score = self._calculate_cv_score(text)
         receipt_score = self._calculate_receipt_score(text)
 
-        if cv_score < CV_THRESHOLD and receipt_score < RECEIPT_THRESHOLD:
-            return DocumentType.UNKNOWN, cv_score, receipt_score
-
-        if cv_score > receipt_score:
-            return DocumentType.CV, cv_score, receipt_score
+        if cv_score >= CV_THRESHOLD and cv_score > receipt_score:
+            return DocumentType.CV
+        elif receipt_score >= RECEIPT_THRESHOLD and receipt_score > cv_score:
+            return DocumentType.RECEIPT
         else:
-            return DocumentType.RECEIPT, cv_score, receipt_score
+            return self._classify_with_llm(text)
 
-    def needs_llm_classification(self, text: str) -> bool:
-        """Returns True if keyword scoring is inconclusive and LLM should be used."""
-        cv_score = self._calculate_cv_score(text)
-        receipt_score = self._calculate_receipt_score(text)
-        return cv_score < CV_THRESHOLD and receipt_score < RECEIPT_THRESHOLD
+    def _classify_with_llm(self, text: str) -> DocumentType:
+        """Use LLM to classify document when keyword scoring is inconclusive."""
+        try:
+            result = self._llm.with_structured_output(DocumentClassification).invoke(
+                [
+                    ("system", DocumentPrompts.CLASSIFICATION_SYSTEM_PROMPT),
+                    ("human", DocumentPrompts.format_classification_prompt(text)),
+                ]
+            )
+
+            if result.document_type == "cv":
+                return DocumentType.CV
+            elif result.document_type == "receipt":
+                return DocumentType.RECEIPT
+            else:
+                return DocumentType.UNKNOWN
+        except Exception:
+            return DocumentType.UNKNOWN

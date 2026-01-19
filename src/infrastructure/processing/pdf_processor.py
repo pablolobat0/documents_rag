@@ -2,13 +2,13 @@ import io
 
 import pypdf
 
-from src.infrastructure.processing.image_captioner import OllamaImageCaptioner
+from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
 
 
 class PypdfProcessor:
     """PyPDF-based PDF processor implementation. Implements PdfProcessorPort."""
 
-    def __init__(self, image_captioner: OllamaImageCaptioner):
+    def __init__(self, image_captioner: LangchainImageCaptioner):
         self.image_captioner = image_captioner
 
     def extract_content(self, file_content: bytes) -> tuple[list[str], int]:

@@ -33,4 +33,3 @@ def render_sidebar():
     st.header("Settings")
     st.caption(f"Model: {settings.model}")
     st.caption(f"Embeddings: {settings.embeddings_model}")
-    st.caption(f"Summary: {settings.summary_model}")

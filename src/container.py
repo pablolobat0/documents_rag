@@ -1,30 +1,41 @@
 from functools import cached_property
 
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+
 from config.settings import settings
 from src.application.use_cases.chat_with_documents import ChatWithDocumentsUseCase
 from src.application.use_cases.process_document import ProcessDocumentUseCase
 from src.infrastructure.agent.langgraph import LanggraphAgent
-from src.infrastructure.llm.ollama import OllamaLLM
 from src.infrastructure.processing.document_classifier import KeywordClassifier
-from src.infrastructure.processing.image_captioner import OllamaImageCaptioner
+from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
+from src.infrastructure.processing.metadata_extractor import LLMMetadataExtractor
 from src.infrastructure.processing.pdf_processor import PypdfProcessor
 from src.infrastructure.processing.text_splitter import LangchainTextSplitter
 from src.infrastructure.storage.filesystem import FilesystemStorage
 from src.infrastructure.storage.qdrant import QdrantVectorStore
-from src.infrastructure.storage.redis import RedisCheckpoint
 
 
 class Container:
     """Dependency injection container using cached_property for lazy singletons."""
 
     @cached_property
-    def ollama(self) -> OllamaLLM:
-        return OllamaLLM(
-            base_url=settings.ollama_url,
-            chat_model=settings.model,
-            embeddings_model=settings.embeddings_model,
-            summary_model=settings.summary_model,
-            image_captioning_model=settings.image_captioning_model,
+    def chat_model(self) -> ChatOllama:
+        return ChatOllama(model=settings.model, base_url=settings.ollama_url)
+
+    @cached_property
+    def summary_model(self) -> ChatOllama:
+        model = settings.summary_model or settings.model
+        return ChatOllama(model=model, base_url=settings.ollama_url)
+
+    @cached_property
+    def image_captioning_model(self) -> ChatOllama:
+        model = settings.image_captioning_model or settings.model
+        return ChatOllama(model=model, base_url=settings.ollama_url)
+
+    @cached_property
+    def embeddings(self) -> OllamaEmbeddings:
+        return OllamaEmbeddings(
+            model=settings.embeddings_model, base_url=settings.ollama_url
         )
 
     @cached_property
@@ -32,21 +43,19 @@ class Container:
         return QdrantVectorStore(
             url=settings.qdrant_url,
             collection_name=settings.qdrant_collection_name,
-            ollama=self.ollama,
+            embeddings=self.embeddings,
+            search_type="mmr",
+            n_results=10,
         )
-
-    @cached_property
-    def redis(self) -> RedisCheckpoint:
-        return RedisCheckpoint(redis_url=settings.redis_url)
 
     @cached_property
     def filesystem(self) -> FilesystemStorage:
         return FilesystemStorage(storage_dir="document_metadata")
 
     @cached_property
-    def image_captioner(self) -> OllamaImageCaptioner:
-        return OllamaImageCaptioner(
-            ollama=self.ollama,
+    def image_captioner(self) -> LangchainImageCaptioner:
+        return LangchainImageCaptioner(
+            llm=self.image_captioning_model,
             min_width=settings.min_image_width,
             min_height=settings.min_image_height,
         )
@@ -57,7 +66,11 @@ class Container:
 
     @cached_property
     def document_classifier(self) -> KeywordClassifier:
-        return KeywordClassifier()
+        return KeywordClassifier(llm=self.chat_model)
+
+    @cached_property
+    def metadata_extractor(self) -> LLMMetadataExtractor:
+        return LLMMetadataExtractor(llm=self.chat_model)
 
     @cached_property
     def text_splitter(self) -> LangchainTextSplitter:
@@ -69,9 +82,9 @@ class Container:
     @cached_property
     def agent(self) -> LanggraphAgent:
         return LanggraphAgent(
-            ollama=self.ollama,
-            qdrant=self.qdrant,
-            redis=self.redis,
+            llm=self.chat_model,
+            vector_store=self.qdrant,
+            redis_url=settings.redis_url,
         )
 
     @cached_property
@@ -81,13 +94,13 @@ class Container:
     @cached_property
     def process_document_use_case(self) -> ProcessDocumentUseCase:
         return ProcessDocumentUseCase(
-            llm=self.ollama,
-            embeddings=self.ollama,
+            embeddings=self.embeddings,
             vector_store=self.qdrant,
             pdf_processor=self.pdf_processor,
             metadata_storage=self.filesystem,
             text_splitter=self.text_splitter,
             document_classifier=self.document_classifier,
+            metadata_extractor=self.metadata_extractor,
         )
 
 

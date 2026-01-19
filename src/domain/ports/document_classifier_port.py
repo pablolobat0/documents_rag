@@ -9,20 +9,8 @@ class DocumentType(Enum):
 
 
 class DocumentClassifierPort(Protocol):
-    """Port for document classification operations."""
+    """Port for document classification."""
 
-    def classify(self, text: str) -> tuple[DocumentType, float, float]:
-        """
-        Classify a document based on its content.
-
-        Args:
-            text: Document text content
-
-        Returns:
-            Tuple of (document_type, cv_score, receipt_score)
-        """
-        ...
-
-    def needs_llm_classification(self, text: str) -> bool:
-        """Returns True if classification is inconclusive and LLM should be used."""
+    def classify(self, text: str) -> DocumentType:
+        """Classify a document based on its content."""
         ...

@@ -11,6 +11,7 @@ def render_file_uploader(process_use_case: ProcessDocumentUseCase):
     uploaded_file = st.file_uploader(
         "Upload a document",
         type=["txt", "pdf"],
+        accept_multiple_files=False,
         help="Supported formats: TXT, PDF (max 10MB)",
     )
 
