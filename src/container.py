@@ -1,6 +1,7 @@
 from functools import cached_property
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langgraph.checkpoint.redis import RedisSaver
 
 from config.settings import settings
 from src.application.use_cases.chat_with_documents import ChatWithDocumentsUseCase
@@ -80,11 +81,15 @@ class Container:
         )
 
     @cached_property
+    def checkpointer(self) -> RedisSaver:
+        return RedisSaver(settings.redis_url)
+
+    @cached_property
     def agent(self) -> LanggraphAgent:
         return LanggraphAgent(
             llm=self.chat_model,
             vector_store=self.qdrant,
-            redis_url=settings.redis_url,
+            checkpointer=self.checkpointer,
         )
 
     @cached_property
@@ -94,7 +99,6 @@ class Container:
     @cached_property
     def process_document_use_case(self) -> ProcessDocumentUseCase:
         return ProcessDocumentUseCase(
-            embeddings=self.embeddings,
             vector_store=self.qdrant,
             pdf_processor=self.pdf_processor,
             metadata_storage=self.filesystem,

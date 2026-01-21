@@ -7,7 +7,6 @@ class VectorStorePort(Protocol):
     def upsert(
         self,
         chunks: list[str],
-        embeddings: list[list[float]],
         metadata: dict | None = None,
     ) -> None:
         """Insert or update document chunks."""

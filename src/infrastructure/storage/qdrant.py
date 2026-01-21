@@ -45,10 +45,10 @@ class QdrantVectorStore:
     def upsert(
         self,
         chunks: list[str],
-        embeddings: list[list[float]],
         metadata: dict | None = None,
     ) -> None:
         """Insert or update document chunks."""
+        embeddings = self._embeddings.embed_documents(chunks)
         points = []
         for chunk, vector in zip(chunks, embeddings):
             points.append(

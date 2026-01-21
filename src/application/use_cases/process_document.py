@@ -6,7 +6,6 @@ from src.application.dto.upload_dto import (
 )
 from src.domain.entities.metadata import Metadata
 from src.domain.ports.document_classifier_port import DocumentClassifierPort
-from src.domain.ports.llm_port import EmbeddingsPort
 from src.domain.ports.metadata_extractor_port import MetadataExtractorPort
 from src.domain.ports.metadata_storage_port import MetadataStoragePort
 from src.domain.ports.pdf_processor_port import PdfProcessorPort
@@ -19,7 +18,6 @@ class ProcessDocumentUseCase:
 
     def __init__(
         self,
-        embeddings: EmbeddingsPort,
         vector_store: VectorStorePort,
         pdf_processor: PdfProcessorPort,
         metadata_storage: MetadataStoragePort,
@@ -27,7 +25,6 @@ class ProcessDocumentUseCase:
         document_classifier: DocumentClassifierPort,
         metadata_extractor: MetadataExtractorPort,
     ):
-        self._embeddings = embeddings
         self._vector_store = vector_store
         self._pdf_processor = pdf_processor
         self._metadata_storage = metadata_storage
@@ -79,9 +76,7 @@ class ProcessDocumentUseCase:
                     message="No chunks created from document",
                 )
 
-            embeddings = self._embeddings.embed_documents(chunks)
-
-            self._vector_store.upsert(chunks, embeddings)
+            self._vector_store.upsert(chunks)
 
             try:
                 self._metadata_storage.save_metadata(extracted_metadata)
