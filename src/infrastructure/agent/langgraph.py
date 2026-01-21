@@ -3,7 +3,7 @@ import re
 from langchain.tools import Tool
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
@@ -20,11 +20,10 @@ class LanggraphAgent:
         self,
         llm: BaseChatModel,
         vector_store: VectorStorePort,
-        redis_url: str,
+        checkpointer: BaseCheckpointSaver,
     ) -> None:
         self._llm = llm
         self.vector_store = vector_store
-        checkpointer = RedisSaver(redis_url)
 
         retriever_tool = Tool(
             name="search_documents",
@@ -51,21 +50,12 @@ class LanggraphAgent:
 
         self._graph = builder.compile(checkpointer=checkpointer)
 
-    def _convert_messages(self, messages: list[ChatMessage]) -> list:
-        """Convert domain ChatMessage to LangChain message types."""
-        langchain_messages = []
-        for msg in messages:
-            if msg.role == "user":
-                langchain_messages.append(HumanMessage(content=msg.content))
-            elif msg.role == "assistant":
-                langchain_messages.append(AIMessage(content=msg.content))
-        return langchain_messages
-
     def _generate_query_or_respond(self, state: MessagesState):
         messages = state["messages"]
-        system_prompt = AgentPrompts.GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT
 
-        llm_messages = [SystemMessage(content=system_prompt)] + list(messages)
+        llm_messages = [
+            SystemMessage(content=AgentPrompts.GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT)
+        ] + list(messages)
 
         response = self._llm.bind_tools(self._tools).invoke(llm_messages)
 
@@ -96,16 +86,12 @@ class LanggraphAgent:
 
             structured_llm = self._llm.with_structured_output(RankedDocuments)
 
-            formatted_docs = "\n\n".join(
-                [
-                    f"Document {i}: {content}"
-                    for i, content in enumerate(documents_content)
-                ]
-            )
+            user_prompt = AgentPrompts.format_reranker_prompt(query, documents_content)
 
-            rerank_prompt = f"{AgentPrompts.RERANK_SYSTEM_PROMPT}\n\nQuery: {query}\n\nRetrieved Documents:\n{formatted_docs}"
-
-            result = structured_llm.invoke([SystemMessage(content=rerank_prompt)])
+            result = structured_llm.invoke([
+                SystemMessage(content=AgentPrompts.RERANK_SYSTEM_PROMPT),
+                HumanMessage(content=user_prompt),
+            ])
 
             if hasattr(result, "documents"):
                 useful_docs = []
@@ -128,3 +114,13 @@ class LanggraphAgent:
             {"configurable": {"thread_id": session_id}},
         )
         return result["messages"][-1].content
+
+    def _convert_messages(self, messages: list[ChatMessage]) -> list:
+        """Convert domain ChatMessage to LangChain message types."""
+        langchain_messages = []
+        for msg in messages:
+            if msg.role == "user":
+                langchain_messages.append(HumanMessage(content=msg.content))
+            elif msg.role == "assistant":
+                langchain_messages.append(AIMessage(content=msg.content))
+        return langchain_messages
