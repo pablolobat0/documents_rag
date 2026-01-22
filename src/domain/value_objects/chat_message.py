@@ -7,6 +7,12 @@ class ChatMessage:
     role: Literal["user", "assistant"]
     content: str
 
+    def __post_init__(self):
+        if self.role not in ("user", "assistant"):
+            raise ValueError(
+                f"Invalid role: {self.role}. Must be 'user' or 'assistant'"
+            )
+
 
 @dataclass(frozen=True)
 class SessionId:

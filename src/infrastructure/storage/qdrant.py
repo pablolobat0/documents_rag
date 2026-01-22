@@ -1,6 +1,9 @@
+import logging
 import uuid
 
 from langchain_core.embeddings import Embeddings
+
+logger = logging.getLogger(__name__)
 
 from src.domain.value_objects.retrieved_document import RetrievedDocument
 from langchain_qdrant import QdrantVectorStore as LangchainQdrantVectorStore
@@ -70,6 +73,10 @@ class QdrantVectorStore:
         query: str,
     ) -> list[RetrievedDocument]:
         """Search for relevant documents and return domain objects."""
+        if not query or not query.strip():
+            logger.warning("Empty query provided for search")
+            return []
+
         docs = self._retriever.invoke(query)
         return [
             RetrievedDocument(

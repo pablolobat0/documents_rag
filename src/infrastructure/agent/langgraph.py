@@ -102,7 +102,7 @@ class LanggraphAgent:
             retrieved_docs = self.vector_store.search(query)
 
             if not retrieved_docs:
-                return []
+                return ["No relevant documents found for this query."]
 
             documents_content = [doc.page_content for doc in retrieved_docs]
 
@@ -121,12 +121,15 @@ class LanggraphAgent:
                     if doc_rel.is_useful and doc_rel.index < len(documents_content):
                         useful_docs.append(documents_content[doc_rel.index])
 
+                if not useful_docs:
+                    return ["No relevant documents found for this query."]
                 return useful_docs
             else:
-                return []
+                return ["No relevant documents found for this query."]
 
         except Exception as e:
-            return [f"Error during retrieval and re-ranking: {e}"]
+            logger.error("Error during retrieval and re-ranking: %s", e)
+            return ["Unable to search documents at this time."]
 
     def run(self, messages: list[ChatMessage], session_id: str) -> str:
         """Run the agent with conversation messages and session ID."""

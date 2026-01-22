@@ -1,10 +1,13 @@
 import base64
 import io
+import logging
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from PIL import Image
 from src.domain.prompts.image_captioner import ImageCaptionerPrompts
+
+logger = logging.getLogger(__name__)
 
 
 class LangchainImageCaptioner:
@@ -26,8 +29,23 @@ class LangchainImageCaptioner:
             with Image.open(io.BytesIO(image_bytes)) as img:
                 width, height = img.size
                 return width >= self.min_width and height >= self.min_height
-        except Exception:
+        except Exception as e:
+            logger.debug("Could not process image for size check: %s", e)
             return False
+
+    def _detect_mime_type(self, image_bytes: bytes) -> str:
+        """Detect MIME type from image bytes."""
+        try:
+            with Image.open(io.BytesIO(image_bytes)) as img:
+                format_to_mime = {
+                    "JPEG": "image/jpeg",
+                    "PNG": "image/png",
+                    "GIF": "image/gif",
+                    "WEBP": "image/webp",
+                }
+                return format_to_mime.get(img.format, "image/jpeg")
+        except Exception:
+            return "image/jpeg"
 
     def get_image_summary(self, image_bytes: bytes) -> str | None:
         """Returns image summary if image meets size requirements, otherwise returns None."""
@@ -35,6 +53,7 @@ class LangchainImageCaptioner:
             return None
 
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        mime_type = self._detect_mime_type(image_bytes)
 
         return self._llm.invoke(
             [
@@ -49,7 +68,7 @@ class LangchainImageCaptioner:
                             "type": "image",
                             "source_type": "base64",
                             "data": image_b64,
-                            "mime_type": "image/jpeg",
+                            "mime_type": mime_type,
                         },
                     ],
                 ),

@@ -34,6 +34,10 @@ class KeywordClassifier:
 
     def classify(self, text: str) -> DocumentType:
         """Classify a document using keyword scoring with LLM fallback."""
+        if not text or not text.strip():
+            logger.warning("Empty text provided for classification")
+            return DocumentType.UNKNOWN
+
         cv_score = self._calculate_score(text, CV_KEYWORDS)
         receipt_score = self._calculate_score(text, RECEIPT_KEYWORDS)
 

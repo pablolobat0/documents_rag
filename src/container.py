@@ -57,17 +57,29 @@ class Container:
 
     @cached_property
     def chat_model(self) -> ChatOllama:
-        return ChatOllama(model=settings.model, base_url=settings.ollama_url)
+        return ChatOllama(
+            model=settings.model,
+            base_url=settings.ollama_url,
+            timeout=settings.llm_timeout,
+        )
 
     @cached_property
     def summary_model(self) -> ChatOllama:
         model = settings.summary_model or settings.model
-        return ChatOllama(model=model, base_url=settings.ollama_url)
+        return ChatOllama(
+            model=model,
+            base_url=settings.ollama_url,
+            timeout=settings.llm_timeout,
+        )
 
     @cached_property
     def image_captioning_model(self) -> ChatOllama:
         model = settings.image_captioning_model or settings.model
-        return ChatOllama(model=model, base_url=settings.ollama_url)
+        return ChatOllama(
+            model=model,
+            base_url=settings.ollama_url,
+            timeout=settings.llm_timeout,
+        )
 
     @cached_property
     def embeddings(self) -> OllamaEmbeddings:
