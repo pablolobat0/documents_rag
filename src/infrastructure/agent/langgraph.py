@@ -1,3 +1,4 @@
+import logging
 import re
 
 from langchain.tools import Tool
@@ -11,6 +12,15 @@ from src.domain.ports.vector_store_port import VectorStorePort
 from src.domain.value_objects.chat_message import ChatMessage
 from src.domain.prompts.agent import AgentPrompts
 from src.infrastructure.agent.schemas import RankedDocuments
+
+logger = logging.getLogger(__name__)
+
+THINKING_TAG_PATTERNS = [
+    r"<think>.*?</think>",
+    r"<thinking>.*?</thinking>",
+    r"<reasoning>.*?</reasoning>",
+    r"<reflection>.*?</reflection>",
+]
 
 
 class LanggraphAgent:
@@ -50,6 +60,20 @@ class LanggraphAgent:
 
         self._graph = builder.compile(checkpointer=checkpointer)
 
+    def _clean_llm_response(self, content: str) -> str:
+        """Remove thinking/reasoning tags from LLM responses.
+
+        Handles various formats like <think>, <thinking>, <reasoning>, etc.
+        Returns cleaned content with tags removed.
+        """
+        original_length = len(content)
+        for pattern in THINKING_TAG_PATTERNS:
+            content = re.sub(pattern, "", content, flags=re.DOTALL)
+        cleaned = content.strip()
+        if len(cleaned) != original_length:
+            logger.debug("Cleaned thinking tags from LLM response")
+        return cleaned
+
     def _generate_query_or_respond(self, state: MessagesState):
         messages = state["messages"]
 
@@ -60,9 +84,7 @@ class LanggraphAgent:
         response = self._llm.bind_tools(self._tools).invoke(llm_messages)
 
         if isinstance(response, AIMessage):
-            cleaned_content = re.sub(
-                r"<think>.*?</think>", "", str(response.content), flags=re.DOTALL
-            ).strip()
+            cleaned_content = self._clean_llm_response(str(response.content))
             response = AIMessage(
                 content=cleaned_content,
                 additional_kwargs=response.additional_kwargs,

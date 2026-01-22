@@ -1,4 +1,6 @@
-from typing import Any, Protocol
+from typing import Protocol
+
+from src.domain.value_objects.retrieved_document import RetrievedDocument
 
 
 class VectorStorePort(Protocol):
@@ -12,6 +14,6 @@ class VectorStorePort(Protocol):
         """Insert or update document chunks."""
         ...
 
-    def search(self, query: str) -> list[Any]:
+    def search(self, query: str) -> list[RetrievedDocument]:
         """Get relevant documents."""
         ...

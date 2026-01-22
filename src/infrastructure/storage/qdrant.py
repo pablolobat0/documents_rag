@@ -1,7 +1,8 @@
-from typing import Any
 import uuid
 
 from langchain_core.embeddings import Embeddings
+
+from src.domain.value_objects.retrieved_document import RetrievedDocument
 from langchain_qdrant import QdrantVectorStore as LangchainQdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -67,6 +68,13 @@ class QdrantVectorStore:
     def search(
         self,
         query: str,
-    ) -> list[Any]:
-        """Get a retriever for searching documents."""
-        return self._retriever.invoke(query)
+    ) -> list[RetrievedDocument]:
+        """Search for relevant documents and return domain objects."""
+        docs = self._retriever.invoke(query)
+        return [
+            RetrievedDocument(
+                page_content=doc.page_content,
+                metadata=doc.metadata,
+            )
+            for doc in docs
+        ]

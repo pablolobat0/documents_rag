@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from src.application.dto.upload_dto import (
@@ -11,6 +12,8 @@ from src.domain.ports.metadata_storage_port import MetadataStoragePort
 from src.domain.ports.pdf_processor_port import PdfProcessorPort
 from src.domain.ports.text_splitter_port import TextSplitterPort
 from src.domain.ports.vector_store_port import VectorStorePort
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessDocumentUseCase:
@@ -81,7 +84,7 @@ class ProcessDocumentUseCase:
             try:
                 self._metadata_storage.save_metadata(extracted_metadata)
             except Exception as e:
-                print(f"Warning: Failed to save metadata: {e}")
+                logger.warning("Failed to save metadata: %s", e)
 
             return ProcessDocumentResponse(
                 success=True,

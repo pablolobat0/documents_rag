@@ -1,10 +1,12 @@
 import json
-from dataclasses import asdict
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Union
 
 from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
+
+logger = logging.getLogger(__name__)
 
 
 class FilesystemStorage:
@@ -32,7 +34,7 @@ class FilesystemStorage:
         """Save metadata to a JSON file and return the file path."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-        metadata_dict = asdict(metadata)
+        metadata_dict = metadata.model_dump()
 
         if metadata_dict.get("created_at"):
             metadata_dict["created_at"] = metadata_dict["created_at"].isoformat()
@@ -83,7 +85,8 @@ class FilesystemStorage:
             else:
                 return Metadata(**data)
 
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load metadata from %s: %s", filename, e)
             return None
 
     def list_metadata_files(self) -> list[str]:

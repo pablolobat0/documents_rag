@@ -1,3 +1,4 @@
+import logging
 from functools import cached_property
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
@@ -15,9 +16,44 @@ from src.infrastructure.processing.text_splitter import LangchainTextSplitter
 from src.infrastructure.storage.filesystem import FilesystemStorage
 from src.infrastructure.storage.qdrant import QdrantVectorStore
 
+logger = logging.getLogger(__name__)
+
+
+class ConfigurationError(Exception):
+    """Raised when required configuration is missing or invalid."""
+
+    pass
+
 
 class Container:
     """Dependency injection container using cached_property for lazy singletons."""
+
+    def __init__(self):
+        self._validate_configuration()
+
+    def _validate_configuration(self) -> None:
+        """Validate required configuration values at initialization."""
+        errors = []
+
+        if not settings.ollama_url:
+            errors.append("OLLAMA_URL is required")
+        if not settings.qdrant_url:
+            errors.append("QDRANT_URL is required")
+        if not settings.redis_url:
+            errors.append("REDIS_URL is required")
+        if not settings.model:
+            errors.append("MODEL is required")
+        if not settings.embeddings_model:
+            errors.append("EMBEDDINGS_MODEL is required")
+
+        if errors:
+            error_msg = "Configuration validation failed:\n" + "\n".join(
+                f"  - {e}" for e in errors
+            )
+            logger.error(error_msg)
+            raise ConfigurationError(error_msg)
+
+        logger.debug("Configuration validated successfully")
 
     @cached_property
     def chat_model(self) -> ChatOllama:

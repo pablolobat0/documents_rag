@@ -1,3 +1,4 @@
+import logging
 import re
 
 from src.domain.entities.classification import DocumentClassification
@@ -10,6 +11,8 @@ from src.infrastructure.processing.classification_keywords import (
     RECEIPT_KEYWORDS,
     RECEIPT_THRESHOLD,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class KeywordClassifier:
@@ -57,5 +60,6 @@ class KeywordClassifier:
                 return DocumentType.RECEIPT
             else:
                 return DocumentType.UNKNOWN
-        except Exception:
+        except Exception as e:
+            logger.warning("LLM classification failed, defaulting to UNKNOWN: %s", e)
             return DocumentType.UNKNOWN

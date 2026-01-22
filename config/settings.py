@@ -31,9 +31,5 @@ class Settings:
     chunk_overlap: int = 50
     max_file_size: int = 10 * 1024 * 1024  # 10MB
 
-    # Token limits
-    tokens_before_summary: int = 4096
-    summary_tokens: int = 1024
-
 
 settings = Settings()

@@ -1,8 +1,11 @@
 import io
+import logging
 
 import pypdf
 
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
+
+logger = logging.getLogger(__name__)
 
 
 class PypdfProcessor:
@@ -46,11 +49,11 @@ class PypdfProcessor:
                             if image_summary is not None:
                                 documents.append(image_summary)
                         except Exception as e:
-                            print(
-                                f"Warning: Could not process image on page {page_num}: {e}"
+                            logger.warning(
+                                "Could not process image on page %d: %s", page_num, e
                             )
                 except Exception as e:
-                    print(f"Warning: Could not process page {page_num}: {e}")
+                    logger.warning("Could not process page %d: %s", page_num, e)
                     continue
 
             if not documents:

@@ -1,9 +1,12 @@
+import logging
 from typing import Union
 
 from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
 from src.domain.ports.document_classifier_port import DocumentType
 from src.domain.ports.llm_port import LLMPort
 from src.domain.prompts.document_processing import DocumentPrompts
+
+logger = logging.getLogger(__name__)
 
 
 class LLMMetadataExtractor:
@@ -48,7 +51,8 @@ class LLMMetadataExtractor:
                 experience=getattr(result, "experience", []),
                 education=getattr(result, "education", []),
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to extract CV metadata: %s", e)
             return CurriculumVitae(
                 pages=base_metadata.pages,
                 document_name=base_metadata.document_name,
@@ -83,7 +87,8 @@ class LLMMetadataExtractor:
                 total_amount=getattr(result, "total_amount", None),
                 items=getattr(result, "items", []),
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to extract receipt metadata: %s", e)
             return Receipt(
                 pages=base_metadata.pages,
                 document_name=base_metadata.document_name,
