@@ -18,23 +18,12 @@ class KeywordClassifier:
     def __init__(self, llm: LLMPort):
         self._llm = llm
 
-    def _calculate_cv_score(self, text: str) -> float:
-        """Calculate CV score based on weighted keyword matches."""
+    def _calculate_score(self, text: str, keywords: dict) -> float:
+        """Calculate score based on weighted keyword matches."""
         text_lower = text.lower()
         total_score = 0.0
 
-        for keyword, weight in CV_KEYWORDS.items():
-            if re.search(r"\b" + re.escape(keyword) + r"\b", text_lower):
-                total_score += weight
-
-        return total_score
-
-    def _calculate_receipt_score(self, text: str) -> float:
-        """Calculate receipt score based on weighted keyword matches."""
-        text_lower = text.lower()
-        total_score = 0.0
-
-        for keyword, weight in RECEIPT_KEYWORDS.items():
+        for keyword, weight in keywords:
             if re.search(r"\b" + re.escape(keyword) + r"\b", text_lower):
                 total_score += weight
 
@@ -42,8 +31,8 @@ class KeywordClassifier:
 
     def classify(self, text: str) -> DocumentType:
         """Classify a document using keyword scoring with LLM fallback."""
-        cv_score = self._calculate_cv_score(text)
-        receipt_score = self._calculate_receipt_score(text)
+        cv_score = self._calculate_score(text, CV_KEYWORDS)
+        receipt_score = self._calculate_score(text, RECEIPT_KEYWORDS)
 
         if cv_score >= CV_THRESHOLD and cv_score > receipt_score:
             return DocumentType.CV
