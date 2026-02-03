@@ -13,7 +13,6 @@ from src.infrastructure.processing.image_captioner import LangchainImageCaptione
 from src.infrastructure.processing.metadata_extractor import LLMMetadataExtractor
 from src.infrastructure.processing.pdf_processor import PypdfProcessor
 from src.infrastructure.processing.text_splitter import LangchainTextSplitter
-from src.infrastructure.storage.filesystem import FilesystemStorage
 from src.infrastructure.storage.qdrant import QdrantVectorStore
 
 logger = logging.getLogger(__name__)
@@ -60,7 +59,6 @@ class Container:
         return ChatOllama(
             model=settings.model,
             base_url=settings.ollama_url,
-            timeout=settings.llm_timeout,
         )
 
     @cached_property
@@ -69,7 +67,6 @@ class Container:
         return ChatOllama(
             model=model,
             base_url=settings.ollama_url,
-            timeout=settings.llm_timeout,
         )
 
     @cached_property
@@ -78,7 +75,6 @@ class Container:
         return ChatOllama(
             model=model,
             base_url=settings.ollama_url,
-            timeout=settings.llm_timeout,
         )
 
     @cached_property
@@ -93,13 +89,7 @@ class Container:
             url=settings.qdrant_url,
             collection_name=settings.qdrant_collection_name,
             embeddings=self.embeddings,
-            search_type="mmr",
-            n_results=10,
         )
-
-    @cached_property
-    def filesystem(self) -> FilesystemStorage:
-        return FilesystemStorage(storage_dir="document_metadata")
 
     @cached_property
     def image_captioner(self) -> LangchainImageCaptioner:
@@ -149,7 +139,6 @@ class Container:
         return ProcessDocumentUseCase(
             vector_store=self.qdrant,
             pdf_processor=self.pdf_processor,
-            metadata_storage=self.filesystem,
             text_splitter=self.text_splitter,
             document_classifier=self.document_classifier,
             metadata_extractor=self.metadata_extractor,

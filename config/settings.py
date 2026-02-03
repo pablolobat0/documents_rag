@@ -13,7 +13,6 @@ class Settings:
     summary_model: str = os.getenv("SUMMARY_MODEL", "llama3.2:3b")
     embeddings_model: str = os.getenv("EMBEDDINGS_MODEL", "all-minilm")
     image_captioning_model: str = os.getenv("IMAGE_CAPTIONING_MODEL", "gemma3:4b")
-    llm_timeout: int = int(os.getenv("LLM_TIMEOUT", "60"))
 
     # Infrastructure URLs
     ollama_url: str = os.getenv("OLLAMA_URL", "http://ollama:11434")

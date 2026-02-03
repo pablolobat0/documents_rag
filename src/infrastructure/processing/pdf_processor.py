@@ -3,6 +3,7 @@ import logging
 
 import pypdf
 
+from src.domain.value_objects.page_content import PageContent
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
 
 logger = logging.getLogger(__name__)
@@ -14,12 +15,12 @@ class PypdfProcessor:
     def __init__(self, image_captioner: LangchainImageCaptioner):
         self.image_captioner = image_captioner
 
-    def extract_content(self, file_content: bytes) -> tuple[list[str], int]:
+    def extract_content(self, file_content: bytes) -> tuple[list[PageContent], int]:
         """
         Extract text and image descriptions from a PDF.
 
         Returns:
-            Tuple of (list of text/image content, number of pages)
+            Tuple of (list of PageContent with page numbers, number of pages)
         """
         try:
             pdf_file = io.BytesIO(file_content)
@@ -36,10 +37,18 @@ class PypdfProcessor:
             documents = []
 
             for page_num, page in enumerate(pdf_reader.pages):
+                page_number = page_num + 1  # Convert to 1-indexed
+
                 try:
                     text = page.extract_text()
                     if text.strip():
-                        documents.append(text)
+                        documents.append(
+                            PageContent(
+                                content=text,
+                                page_number=page_number,
+                                content_type="text",
+                            )
+                        )
 
                     for image in page.images:
                         try:
@@ -47,13 +56,19 @@ class PypdfProcessor:
                                 image.data
                             )
                             if image_summary is not None:
-                                documents.append(image_summary)
+                                documents.append(
+                                    PageContent(
+                                        content=image_summary,
+                                        page_number=page_number,
+                                        content_type="image_caption",
+                                    )
+                                )
                         except Exception as e:
                             logger.warning(
-                                "Could not process image on page %d: %s", page_num, e
+                                "Could not process image on page %d: %s", page_number, e
                             )
                 except Exception as e:
-                    logger.warning("Could not process page %d: %s", page_num, e)
+                    logger.warning("Could not process page %d: %s", page_number, e)
                     continue
 
             if not documents:

@@ -21,7 +21,6 @@ class CurriculumVitae(Metadata):
     email: str | None = None
     phone_number: str | None = None
     linkedin_profile: str | None = None
-    # In Pydantic, use Field(default_factory=list) for mutable defaults
     skills: list[str] = Field(default_factory=list)
     experience: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)

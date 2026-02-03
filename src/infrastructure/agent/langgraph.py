@@ -99,7 +99,7 @@ class LanggraphAgent:
     def _retrieve_documents(self, query: str) -> list[str]:
         """Search documents and return relevant snippets based on the query."""
         try:
-            retrieved_docs = self.vector_store.search(query)
+            retrieved_docs = self.vector_store.search(query, 10)
 
             if not retrieved_docs:
                 return ["No relevant documents found for this query."]
@@ -110,10 +110,12 @@ class LanggraphAgent:
 
             user_prompt = AgentPrompts.format_reranker_prompt(query, documents_content)
 
-            result = structured_llm.invoke([
-                SystemMessage(content=AgentPrompts.RERANK_SYSTEM_PROMPT),
-                HumanMessage(content=user_prompt),
-            ])
+            result = structured_llm.invoke(
+                [
+                    SystemMessage(content=AgentPrompts.RERANK_SYSTEM_PROMPT),
+                    HumanMessage(content=user_prompt),
+                ]
+            )
 
             if hasattr(result, "documents"):
                 useful_docs = []
