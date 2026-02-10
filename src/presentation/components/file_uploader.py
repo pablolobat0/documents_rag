@@ -10,9 +10,9 @@ def render_file_uploader(process_use_case: ProcessDocumentUseCase):
     """Render the file upload interface."""
     uploaded_file = st.file_uploader(
         "Upload a document",
-        type=["txt", "pdf"],
+        type=["txt", "pdf", "md"],
         accept_multiple_files=False,
-        help="Supported formats: TXT, PDF (max 10MB)",
+        help="Supported formats: TXT, PDF, Markdown (max 10MB)",
     )
 
     if uploaded_file is not None:

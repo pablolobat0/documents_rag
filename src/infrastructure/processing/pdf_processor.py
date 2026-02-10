@@ -10,10 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 class PypdfProcessor:
-    """PyPDF-based PDF processor implementation. Implements PdfProcessorPort."""
+    """PyPDF-based PDF processor implementation. Implements ContentExtractorPort."""
 
     def __init__(self, image_captioner: LangchainImageCaptioner):
         self.image_captioner = image_captioner
+
+    @property
+    def supported_content_types(self) -> list[str]:
+        return ["application/pdf"]
 
     def extract_content(self, file_content: bytes) -> tuple[list[PageContent], int]:
         """

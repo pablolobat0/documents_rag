@@ -8,10 +8,11 @@ from src.application.dto.upload_dto import (
 from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
 from src.domain.ports.document_classifier_port import DocumentClassifierPort
 from src.domain.ports.metadata_extractor_port import MetadataExtractorPort
-from src.domain.ports.pdf_processor_port import PdfProcessorPort
 from src.domain.ports.text_splitter_port import TextSplitterPort
 from src.domain.ports.vector_store_port import VectorStorePort
-from src.domain.value_objects.page_content import PageContent
+from src.infrastructure.processing.content_extractor_registry import (
+    ContentExtractorRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +23,13 @@ class ProcessDocumentUseCase:
     def __init__(
         self,
         vector_store: VectorStorePort,
-        pdf_processor: PdfProcessorPort,
+        content_extractor_registry: ContentExtractorRegistry,
         text_splitter: TextSplitterPort,
         document_classifier: DocumentClassifierPort,
         metadata_extractor: MetadataExtractorPort,
     ):
         self._vector_store = vector_store
-        self._pdf_processor = pdf_processor
+        self._content_extractor_registry = content_extractor_registry
         self._text_splitter = text_splitter
         self._document_classifier = document_classifier
         self._metadata_extractor = metadata_extractor
@@ -36,17 +37,20 @@ class ProcessDocumentUseCase:
     def execute(self, request: ProcessDocumentRequest) -> ProcessDocumentResponse:
         """Process a document and store it in the vector database."""
         try:
-            # Extract content with page information
-            if request.content_type == "application/pdf":
-                page_contents, pages = self._pdf_processor.extract_content(
-                    request.content
+            # Get appropriate extractor for content type
+            extractor = self._content_extractor_registry.get_extractor(
+                request.content_type
+            )
+            if extractor is None:
+                return ProcessDocumentResponse(
+                    success=False,
+                    metadata=Metadata(pages=0),
+                    chunks_created=0,
+                    message=f"Unsupported content type: {request.content_type}",
                 )
-            else:
-                content = request.content.decode("utf-8")
-                page_contents = [
-                    PageContent(content=content, page_number=1, content_type="text")
-                ]
-                pages = 1
+
+            # Extract content with page/section information
+            page_contents, pages = extractor.extract_content(request.content)
 
             if not page_contents:
                 return ProcessDocumentResponse(

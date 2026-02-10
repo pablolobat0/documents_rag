@@ -5,13 +5,21 @@ from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langgraph.checkpoint.redis import RedisSaver
 
 from config.settings import settings
+from src.application.use_cases.batch_process_documents import (
+    BatchProcessDocumentUseCase,
+)
 from src.application.use_cases.chat_with_documents import ChatWithDocumentsUseCase
 from src.application.use_cases.process_document import ProcessDocumentUseCase
 from src.infrastructure.agent.langgraph import LanggraphAgent
+from src.infrastructure.processing.content_extractor_registry import (
+    ContentExtractorRegistry,
+)
 from src.infrastructure.processing.document_classifier import KeywordClassifier
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
+from src.infrastructure.processing.markdown_processor import MarkdownProcessor
 from src.infrastructure.processing.metadata_extractor import LLMMetadataExtractor
 from src.infrastructure.processing.pdf_processor import PypdfProcessor
+from src.infrastructure.processing.text_processor import PlainTextProcessor
 from src.infrastructure.processing.text_splitter import LangchainTextSplitter
 from src.infrastructure.storage.qdrant import QdrantVectorStore
 
@@ -104,6 +112,22 @@ class Container:
         return PypdfProcessor(image_captioner=self.image_captioner)
 
     @cached_property
+    def markdown_processor(self) -> MarkdownProcessor:
+        return MarkdownProcessor()
+
+    @cached_property
+    def text_processor(self) -> PlainTextProcessor:
+        return PlainTextProcessor()
+
+    @cached_property
+    def content_extractor_registry(self) -> ContentExtractorRegistry:
+        registry = ContentExtractorRegistry()
+        registry.register(self.pdf_processor)
+        registry.register(self.markdown_processor)
+        registry.register(self.text_processor)
+        return registry
+
+    @cached_property
     def document_classifier(self) -> KeywordClassifier:
         return KeywordClassifier(llm=self.chat_model)
 
@@ -138,10 +162,16 @@ class Container:
     def process_document_use_case(self) -> ProcessDocumentUseCase:
         return ProcessDocumentUseCase(
             vector_store=self.qdrant,
-            pdf_processor=self.pdf_processor,
+            content_extractor_registry=self.content_extractor_registry,
             text_splitter=self.text_splitter,
             document_classifier=self.document_classifier,
             metadata_extractor=self.metadata_extractor,
+        )
+
+    @cached_property
+    def batch_process_document_use_case(self) -> BatchProcessDocumentUseCase:
+        return BatchProcessDocumentUseCase(
+            process_document_use_case=self.process_document_use_case
         )
 
 
