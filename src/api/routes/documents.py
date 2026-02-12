@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile
 
 from src.api.schemas import BatchResponseSchema, DocumentResultSchema, MetadataSchema
 from src.application.dto.batch_upload_dto import BatchProcessDocumentRequest
@@ -9,12 +9,21 @@ from src.container import get_container
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-@router.post("/batch", response_model=BatchResponseSchema)
+@router.post(
+    "/batch",
+    response_model=BatchResponseSchema,
+    summary="Process documents in batch",
+    description="Upload one or more files (PDF, Markdown, plain text) for extraction, "
+    "chunking, and vector-store indexing. Each file is processed independently — "
+    "a failure in one document does not affect the others.",
+)
 async def batch_upload(files: list[UploadFile]) -> BatchResponseSchema:
-    """Process multiple uploaded documents."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
     container = get_container()
 
     documents = []
@@ -29,7 +38,14 @@ async def batch_upload(files: list[UploadFile]) -> BatchResponseSchema:
         )
 
     request = BatchProcessDocumentRequest(documents=documents)
-    response = container.batch_process_document_use_case.execute(request)
+
+    try:
+        response = container.batch_process_document_use_case.execute(request)
+    except Exception:
+        logger.exception("Batch processing failed unexpectedly")
+        raise HTTPException(
+            status_code=500, detail="Internal error during document processing"
+        )
 
     results = [
         DocumentResultSchema(

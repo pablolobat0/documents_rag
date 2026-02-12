@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import ChatRequestSchema, ChatResponseSchema
 from src.application.dto.chat_dto import ChatRequest
@@ -9,22 +9,37 @@ from src.domain.value_objects.chat_message import ChatMessage, SessionId
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(tags=["Chat"])
 
 
-@router.post("/chat", response_model=ChatResponseSchema)
+@router.post(
+    "/chat",
+    response_model=ChatResponseSchema,
+    summary="Chat with documents",
+    description="Send the full conversation history and receive an AI-generated "
+    "response grounded in the indexed documents. The session_id maintains "
+    "conversation state across requests.",
+)
 async def chat(request: ChatRequestSchema) -> ChatResponseSchema:
-    """Send a chat message and get a response."""
     container = get_container()
 
-    chat_request = ChatRequest(
-        session_id=SessionId(request.session_id),
-        messages=[
-            ChatMessage(role=m.role, content=m.content) for m in request.messages
-        ],
-    )
+    try:
+        chat_request = ChatRequest(
+            session_id=SessionId(request.session_id),
+            messages=[
+                ChatMessage(role=m.role, content=m.content) for m in request.messages
+            ],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
-    response = container.chat_use_case.execute(chat_request)
+    try:
+        response = container.chat_use_case.execute(chat_request)
+    except Exception:
+        logger.exception("Chat execution failed for session %s", request.session_id)
+        raise HTTPException(
+            status_code=500, detail="Internal error during chat processing"
+        )
 
     return ChatResponseSchema(
         content=response.content,

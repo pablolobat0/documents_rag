@@ -20,16 +20,21 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
-app = FastAPI(title="Documents RAG API", description="", lifespan=lifespan)
+app = FastAPI(
+    title="Documents RAG API",
+    description="RAG backend for document processing and conversational retrieval. "
+    "Upload PDF, Markdown, or plain-text files to build a vector index, "
+    "then query them through a chat interface.",
+    version="0.2.0",
+    lifespan=lifespan,
+)
 
 api_router = APIRouter()
-
 api_router.include_router(documents_router)
 api_router.include_router(chat_router)
-
 app.include_router(api_router, prefix=settings.api_prefix)
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"], summary="Health check")
 async def health():
     return {"status": "ok"}

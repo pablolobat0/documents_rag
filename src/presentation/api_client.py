@@ -7,7 +7,7 @@ class ApiClient:
     """HTTP client for communicating with the FastAPI backend."""
 
     def __init__(self, base_url: str = settings.api_url):
-        self._base_url = base_url
+        self._base_url = f"{base_url}{settings.api_prefix}"
 
     def send_documents(
         self, files: list[tuple[str, bytes, str]]
@@ -26,7 +26,7 @@ class ApiClient:
         ]
         with httpx.Client(timeout=300.0) as client:
             response = client.post(
-                f"{self._base_url}/api/documents/batch",
+                f"{self._base_url}/documents/batch",
                 files=multipart_files,
             )
             response.raise_for_status()
@@ -44,7 +44,7 @@ class ApiClient:
         """
         with httpx.Client(timeout=120.0) as client:
             response = client.post(
-                f"{self._base_url}/api/chat",
+                f"{self._base_url}/chat",
                 json={"session_id": session_id, "messages": messages},
             )
             response.raise_for_status()
