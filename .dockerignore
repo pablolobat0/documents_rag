@@ -1,7 +1,15 @@
 .venv
+.git
 .gitignore
 .dockerignore
+.ruff_cache/
+.secrets.baseline
+.pre-commit-config.yaml
+
 Dockerfile
-.git
-README.md
 compose.yaml
+README.md
+CLAUDE.md
+
+tests/
+document_metadata/

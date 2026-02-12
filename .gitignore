@@ -8,9 +8,14 @@ wheels/
 
 # Virtual environments
 .venv
+.env
 
 # Ruff
 .ruff_cache/
-.env
+
+# Pre-commit
+.pre-commit-cache/
+
+# Project
 document_metadata/
 CLAUDE.md
