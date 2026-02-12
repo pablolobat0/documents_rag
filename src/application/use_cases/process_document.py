@@ -96,7 +96,7 @@ class ProcessDocumentUseCase:
                 success=False,
                 metadata=Metadata(pages=0),
                 chunks_created=0,
-                message=f"Error processing document: {str(e)}",
+                message=f"Error processing document: {e!s}",
             )
 
     def _build_chunk_metadata(self, metadata: Metadata) -> dict:

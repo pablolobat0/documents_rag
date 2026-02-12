@@ -35,7 +35,7 @@ class TestParseFrontmatter:
 
     def test_list_values_in_frontmatter_preserved(self, processor):
         text = "---\ntags:\n  - python\n  - testing\n---\nBody"
-        frontmatter, body = processor._parse_frontmatter(text)
+        frontmatter, _body = processor._parse_frontmatter(text)
         assert frontmatter["tags"] == ["python", "testing"]
 
 
@@ -97,7 +97,7 @@ class TestExtractContent:
         assert result.page_contents == []
 
     def test_unicode_content(self, processor):
-        content = "# Título\n\nContenido con acentos y ñ".encode("utf-8")
+        content = "# Título\n\nContenido con acentos y ñ".encode()
         result = processor.extract_content(content)
         assert result.total_pages == 1
         assert "ñ" in result.page_contents[0].content

@@ -9,9 +9,7 @@ class ApiClient:
     def __init__(self, base_url: str = settings.api_url):
         self._base_url = f"{base_url}{settings.api_prefix}"
 
-    def send_documents(
-        self, files: list[tuple[str, bytes, str]]
-    ) -> dict:
+    def send_documents(self, files: list[tuple[str, bytes, str]]) -> dict:
         """Upload documents to the API.
 
         Args:

@@ -1,12 +1,11 @@
 import logging
 
 from langchain_core.embeddings import Embeddings
-from langchain_qdrant import QdrantVectorStore as LangchainQdrantVectorStore
 from langchain_qdrant import FastEmbedSparse, RetrievalMode
+from langchain_qdrant import QdrantVectorStore as LangchainQdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.models import Distance, VectorParams, SparseVectorParams
-
+from qdrant_client.models import Distance, SparseVectorParams, VectorParams
 
 from src.domain.value_objects.document_chunk import DocumentChunk
 from src.domain.value_objects.retrieved_document import RetrievedDocument
@@ -33,7 +32,9 @@ class QdrantVectorStore:
         if not self.client.collection_exists(collection_name):
             self.client.create_collection(
                 collection_name=collection_name,
-                vectors_config={"dense": VectorParams(size=vector_size, distance=Distance.COSINE)},
+                vectors_config={
+                    "dense": VectorParams(size=vector_size, distance=Distance.COSINE)
+                },
                 sparse_vectors_config={
                     "sparse": SparseVectorParams(
                         index=models.SparseIndexParams(on_disk=False)

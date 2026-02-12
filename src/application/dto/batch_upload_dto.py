@@ -45,4 +45,6 @@ class BatchProcessDocumentResponse:
     @property
     def total_chunks_created(self) -> int:
         """Calculate total chunks created across all successful documents."""
-        return sum(r.response.chunks_created for r in self.results if r.response.success)
+        return sum(
+            r.response.chunks_created for r in self.results if r.response.success
+        )

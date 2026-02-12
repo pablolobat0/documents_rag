@@ -79,9 +79,7 @@ class PypdfProcessor:
             if not documents:
                 raise ValueError("No extractable content found in PDF")
 
-            return ExtractionResult(
-                page_contents=documents, total_pages=pdf_pages
-            )
+            return ExtractionResult(page_contents=documents, total_pages=pdf_pages)
 
         except Exception as e:
-            raise ValueError(f"Failed to process PDF: {str(e)}")
+            raise ValueError(f"Failed to process PDF: {e!s}") from e

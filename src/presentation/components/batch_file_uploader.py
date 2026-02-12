@@ -192,8 +192,7 @@ def _display_batch_results(response: dict):
         )
     else:
         st.warning(
-            f"Processed {total} documents: "
-            f"{successful} succeeded, {failed} failed"
+            f"Processed {total} documents: {successful} succeeded, {failed} failed"
         )
 
     for _ in range(successful):
@@ -202,8 +201,6 @@ def _display_batch_results(response: dict):
     with st.expander("View Processing Details"):
         for r in results:
             if r["success"]:
-                st.success(
-                    f"**{r['filename']}**: {r['chunks_created']} chunks created"
-                )
+                st.success(f"**{r['filename']}**: {r['chunks_created']} chunks created")
             else:
                 st.error(f"**{r['filename']}**: {r['message']}")

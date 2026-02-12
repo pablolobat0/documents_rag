@@ -6,7 +6,6 @@ from src.application.dto.upload_dto import ProcessDocumentRequest
 from src.application.use_cases.process_document import ProcessDocumentUseCase
 from src.domain.entities.metadata import Metadata
 from src.domain.value_objects.extraction_result import ExtractionResult
-from src.domain.value_objects.page_content import PageContent
 
 
 @pytest.fixture

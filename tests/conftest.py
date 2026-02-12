@@ -12,7 +12,6 @@ from src.infrastructure.processing.content_extractor_registry import (
     ContentExtractorRegistry,
 )
 
-
 # --- Markdown sample fixtures ---
 
 

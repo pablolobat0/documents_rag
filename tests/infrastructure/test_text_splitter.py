@@ -60,12 +60,9 @@ class TestSplitPages:
         pages = [PageContent(content=text, page_number=1, content_type="text")]
         chunks = splitter.split_pages(pages, {})
         assert len(chunks) > 1
-        # With overlap, consecutive chunks should share some content
+        # Soft check: overlap depends on split boundaries, so just verify
+        # consecutive chunks aren't identical for large enough chunks
         for i in range(len(chunks) - 1):
-            current_end = chunks[i].content[-10:]
-            next_start = chunks[i + 1].content[:50]
-            # At least some overlap text should appear in next chunk
-            # (this is a soft check since overlap depends on split boundaries)
             assert (
                 len(chunks[i].content) <= 50
                 or chunks[i].content != chunks[i + 1].content

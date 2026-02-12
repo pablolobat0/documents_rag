@@ -48,4 +48,4 @@ def render_file_uploader(process_use_case: ProcessDocumentUseCase):
                     else:
                         st.error(f"Failed: {response.message}")
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                    st.error(f"Error: {e!s}")

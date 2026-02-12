@@ -9,8 +9,8 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from src.domain.ports.vector_store_port import VectorStorePort
-from src.domain.value_objects.chat_message import ChatMessage
 from src.domain.prompts.agent import AgentPrompts
+from src.domain.value_objects.chat_message import ChatMessage
 from src.infrastructure.agent.schemas import RankedDocuments
 
 logger = logging.getLogger(__name__)
@@ -78,8 +78,9 @@ class LanggraphAgent:
         messages = state["messages"]
 
         llm_messages = [
-            SystemMessage(content=AgentPrompts.GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT)
-        ] + list(messages)
+            SystemMessage(content=AgentPrompts.GENERATE_QUERY_OR_RESPOND_SYSTEM_PROMPT),
+            *messages,
+        ]
 
         response = self._llm.bind_tools(self._tools).invoke(llm_messages)
 
@@ -117,7 +118,7 @@ class LanggraphAgent:
                 ]
             )
 
-            if hasattr(result, "documents"):
+            if isinstance(result, RankedDocuments):
                 useful_docs = []
                 for doc_rel in result.documents:
                     if doc_rel.is_useful and doc_rel.index < len(documents_content):

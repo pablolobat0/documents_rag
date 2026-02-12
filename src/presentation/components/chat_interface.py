@@ -19,20 +19,19 @@ def render_chat():
             st.markdown(prompt)
 
         # Get AI response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    response = api_client.send_chat(
-                        session_id=st.session_state.session_id,
-                        messages=[
-                            {"role": m["role"], "content": m["content"]}
-                            for m in st.session_state.messages
-                        ],
-                    )
-                    content = response["content"]
-                    st.markdown(content)
-                    add_message("assistant", content)
-                except Exception as e:
-                    error_msg = f"Error: {str(e)}"
-                    st.error(error_msg)
-                    add_message("assistant", error_msg)
+        with st.chat_message("assistant"), st.spinner("Thinking..."):
+            try:
+                response = api_client.send_chat(
+                    session_id=st.session_state.session_id,
+                    messages=[
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.messages
+                    ],
+                )
+                content = response["content"]
+                st.markdown(content)
+                add_message("assistant", content)
+            except Exception as e:
+                error_msg = f"Error: {e!s}"
+                st.error(error_msg)
+                add_message("assistant", error_msg)

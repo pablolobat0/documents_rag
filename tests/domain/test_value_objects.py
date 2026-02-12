@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pytest
 
 from src.domain.value_objects.chat_message import ChatMessage, SessionId

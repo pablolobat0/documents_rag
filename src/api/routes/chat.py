@@ -31,15 +31,15 @@ async def chat(request: ChatRequestSchema) -> ChatResponseSchema:
             ],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
         response = container.chat_use_case.execute(chat_request)
-    except Exception:
+    except Exception as exc:
         logger.exception("Chat execution failed for session %s", request.session_id)
         raise HTTPException(
             status_code=500, detail="Internal error during chat processing"
-        )
+        ) from exc
 
     return ChatResponseSchema(
         content=response.content,

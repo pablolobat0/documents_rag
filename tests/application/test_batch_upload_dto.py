@@ -1,5 +1,3 @@
-import pytest
-
 from src.application.dto.batch_upload_dto import (
     BatchProcessDocumentResponse,
     DocumentProcessingResult,

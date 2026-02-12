@@ -41,11 +41,11 @@ async def batch_upload(files: list[UploadFile]) -> BatchResponseSchema:
 
     try:
         response = container.batch_process_document_use_case.execute(request)
-    except Exception:
+    except Exception as exc:
         logger.exception("Batch processing failed unexpectedly")
         raise HTTPException(
             status_code=500, detail="Internal error during document processing"
-        )
+        ) from exc
 
     results = [
         DocumentResultSchema(

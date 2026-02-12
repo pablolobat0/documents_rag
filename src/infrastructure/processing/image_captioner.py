@@ -5,6 +5,7 @@ import logging
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from PIL import Image
+
 from src.domain.prompts.image_captioner import ImageCaptionerPrompts
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class LangchainImageCaptioner:
                     "GIF": "image/gif",
                     "WEBP": "image/webp",
                 }
-                return format_to_mime.get(img.format, "image/jpeg")
+                return format_to_mime.get(img.format or "", "image/jpeg")
         except Exception:
             return "image/jpeg"
 
@@ -55,7 +56,7 @@ class LangchainImageCaptioner:
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         mime_type = self._detect_mime_type(image_bytes)
 
-        return self._llm.invoke(
+        response = self._llm.invoke(
             [
                 SystemMessage(ImageCaptionerPrompts.CAPTION_IMAGE_SYSTEM_PROMPT),
                 HumanMessage(
@@ -73,4 +74,8 @@ class LangchainImageCaptioner:
                     ],
                 ),
             ]
-        ).content
+        )
+        content = response.content
+        if isinstance(content, str):
+            return content
+        return str(content)
