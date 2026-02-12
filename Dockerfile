@@ -14,7 +14,7 @@ RUN uv sync
 
 COPY . .
 
-EXPOSE 8501
+EXPOSE 8000
 
-CMD ["uv", "run", "streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["uv", "run", "uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
 

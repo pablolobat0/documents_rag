@@ -4,14 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 from config.settings import settings
-from src.application.dto.batch_upload_dto import (
-    BatchProcessDocumentRequest,
-    BatchProcessDocumentResponse,
-)
-from src.application.dto.upload_dto import ProcessDocumentRequest
-from src.application.use_cases.batch_process_documents import (
-    BatchProcessDocumentUseCase,
-)
+from src.presentation.api_client import api_client
 from src.presentation.state.session_state import increment_document_count
 
 SUPPORTED_EXTENSIONS = {".txt", ".pdf", ".md"}
@@ -22,7 +15,7 @@ EXTENSION_MIME_MAP = {
 }
 
 
-def render_batch_file_uploader(batch_use_case: BatchProcessDocumentUseCase):
+def render_batch_file_uploader():
     """Render the batch file upload interface with progress feedback."""
     source = st.radio(
         "Source",
@@ -32,12 +25,12 @@ def render_batch_file_uploader(batch_use_case: BatchProcessDocumentUseCase):
     )
 
     if source == "Upload files":
-        _render_upload_tab(batch_use_case)
+        _render_upload_tab()
     else:
-        _render_local_path_tab(batch_use_case)
+        _render_local_path_tab()
 
 
-def _render_upload_tab(batch_use_case: BatchProcessDocumentUseCase):
+def _render_upload_tab():
     """Render the drag-and-drop file uploader."""
     ext_list = sorted(ext.lstrip(".") for ext in SUPPORTED_EXTENSIONS)
     uploaded_files = st.file_uploader(
@@ -61,18 +54,18 @@ def _render_upload_tab(batch_use_case: BatchProcessDocumentUseCase):
             if st.button(
                 "Process All Documents", type="primary", use_container_width=True
             ):
-                documents = [
-                    ProcessDocumentRequest(
-                        content=f.getvalue(),
-                        filename=f.name,
-                        content_type=f.type or "application/octet-stream",
+                files_to_send = [
+                    (
+                        f.name,
+                        f.getvalue(),
+                        f.type or "application/octet-stream",
                     )
                     for f in valid_files
                 ]
-                _process_batch(documents, batch_use_case)
+                _process_batch(files_to_send)
 
 
-def _render_local_path_tab(batch_use_case: BatchProcessDocumentUseCase):
+def _render_local_path_tab():
     """Render the local path input for files/folders."""
     path_input = st.text_input(
         "Path",
@@ -80,13 +73,17 @@ def _render_local_path_tab(batch_use_case: BatchProcessDocumentUseCase):
         help="Enter a file path, folder path, or glob pattern (e.g. /docs/**/*.md)",
     )
 
-    if not path_input:
-        return
+    # Scan button — file resolution only happens on click
+    if st.button("Scan", use_container_width=True):
+        if not path_input:
+            st.warning("Enter a path first.")
+            return
+        resolved = _resolve_path(path_input.strip())
+        st.session_state["_scanned_files"] = resolved
 
-    resolved_files = _resolve_path(path_input.strip())
+    resolved_files: list[Path] = st.session_state.get("_scanned_files", [])
 
     if not resolved_files:
-        st.warning("No supported files found at the given path.")
         return
 
     st.info(f"{len(resolved_files)} file(s) found")
@@ -95,45 +92,40 @@ def _render_local_path_tab(batch_use_case: BatchProcessDocumentUseCase):
             st.text(str(f))
 
     if st.button("Process All Documents", type="primary", use_container_width=True):
-        documents = []
+        files_to_send = []
         skipped = []
         for file_path in resolved_files:
             if file_path.stat().st_size > settings.max_file_size:
                 skipped.append(file_path.name)
                 continue
-            documents.append(
-                ProcessDocumentRequest(
-                    content=file_path.read_bytes(),
-                    filename=file_path.name,
-                    content_type=_get_mime_type(file_path),
+            files_to_send.append(
+                (
+                    file_path.name,
+                    file_path.read_bytes(),
+                    _get_mime_type(file_path),
                 )
             )
 
         for name in skipped:
             st.warning(f"Skipping {name}: File too large (max 10MB)")
 
-        if documents:
-            _process_batch(documents, batch_use_case)
+        if files_to_send:
+            _process_batch(files_to_send)
         else:
             st.error("No valid files to process after filtering.")
 
 
 def _resolve_path(path_str: str) -> list[Path]:
-    """Resolve a path string into a list of supported files.
-
-    Supports:
-    - Single file path
-    - Directory path (recursively finds supported files)
-    - Glob patterns (e.g. /docs/**/*.md)
-    """
-    # Check for glob characters
+    """Resolve a path string into a list of supported files."""
     if any(c in path_str for c in ("*", "?", "[")):
         base = Path(path_str.split("*")[0].split("?")[0].split("[")[0]).parent
         if not base.exists():
             return []
         pattern = path_str[len(str(base)) :].lstrip("/")
         return sorted(
-            f for f in base.glob(pattern) if f.is_file() and f.suffix in SUPPORTED_EXTENSIONS
+            f
+            for f in base.glob(pattern)
+            if f.is_file() and f.suffix in SUPPORTED_EXTENSIONS
         )
 
     path = Path(path_str)
@@ -163,50 +155,55 @@ def _get_mime_type(file_path: Path) -> str:
     return guessed or "application/octet-stream"
 
 
-def _process_batch(
-    documents: list[ProcessDocumentRequest],
-    batch_use_case: BatchProcessDocumentUseCase,
-):
-    """Process a batch of documents with progress display."""
+def _process_batch(files: list[tuple[str, bytes, str]]):
+    """Process a batch of documents via the API."""
     progress_bar = st.progress(0)
     status_text = st.empty()
+    status_text.text(f"Uploading {len(files)} file(s) to API...")
+    progress_bar.progress(0.5)
 
-    request = BatchProcessDocumentRequest(documents=documents)
-
-    def update_progress(current: int, total: int, filename: str):
-        progress_bar.progress(current / total)
-        status_text.text(f"Processing {current}/{total}: {filename}")
-
-    response = batch_use_case.execute(request, progress_callback=update_progress)
+    try:
+        result = api_client.send_documents(files)
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"API error: {e}")
+        return
 
     progress_bar.empty()
     status_text.empty()
 
-    _display_batch_results(response)
+    _display_batch_results(result)
 
 
-def _display_batch_results(response: BatchProcessDocumentResponse):
+def _display_batch_results(response: dict):
     """Display batch processing results."""
-    if response.all_succeeded:
+    total = response["total_documents"]
+    successful = response["successful"]
+    failed = response["failed"]
+    results = response["results"]
+
+    total_chunks = sum(r["chunks_created"] for r in results if r["success"])
+
+    if failed == 0 and total > 0:
         st.success(
-            f"All {response.total_documents} documents processed successfully! "
-            f"Total chunks created: {response.total_chunks_created}"
+            f"All {total} documents processed successfully! "
+            f"Total chunks created: {total_chunks}"
         )
-        for _ in range(response.successful):
-            increment_document_count()
     else:
         st.warning(
-            f"Processed {response.total_documents} documents: "
-            f"{response.successful} succeeded, {response.failed} failed"
+            f"Processed {total} documents: "
+            f"{successful} succeeded, {failed} failed"
         )
-        for _ in range(response.successful):
-            increment_document_count()
+
+    for _ in range(successful):
+        increment_document_count()
 
     with st.expander("View Processing Details"):
-        for result in response.results:
-            if result.response.success:
+        for r in results:
+            if r["success"]:
                 st.success(
-                    f"**{result.filename}**: {result.response.chunks_created} chunks created"
+                    f"**{r['filename']}**: {r['chunks_created']} chunks created"
                 )
             else:
-                st.error(f"**{result.filename}**: {result.response.message}")
+                st.error(f"**{r['filename']}**: {r['message']}")

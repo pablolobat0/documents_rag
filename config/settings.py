@@ -18,6 +18,10 @@ class Settings:
     ollama_url: str = os.getenv("OLLAMA_URL", "http://ollama:11434")
     qdrant_url: str = os.getenv("QDRANT_URL", "http://qdrant:6333")
     redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379")
+    api_url: str = os.getenv("API_URL", "http://localhost:8000")
+
+    # API
+    api_prefix: str = "/api/v1"
 
     # Qdrant
     qdrant_collection_name: str = os.getenv("QDRANT_COLLECTION_NAME", "documents")

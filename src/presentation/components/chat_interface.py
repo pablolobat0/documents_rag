@@ -1,12 +1,10 @@
 import streamlit as st
 
-from src.application.dto.chat_dto import ChatRequest
-from src.application.use_cases.chat_with_documents import ChatWithDocumentsUseCase
-from src.domain.value_objects.chat_message import ChatMessage, SessionId
+from src.presentation.api_client import api_client
 from src.presentation.state.session_state import add_message
 
 
-def render_chat(chat_use_case: ChatWithDocumentsUseCase):
+def render_chat():
     """Render the chat interface."""
     # Display chat history
     for message in st.session_state.messages:
@@ -24,16 +22,16 @@ def render_chat(chat_use_case: ChatWithDocumentsUseCase):
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    request = ChatRequest(
-                        session_id=SessionId(st.session_state.session_id),
+                    response = api_client.send_chat(
+                        session_id=st.session_state.session_id,
                         messages=[
-                            ChatMessage(role=m["role"], content=m["content"])
+                            {"role": m["role"], "content": m["content"]}
                             for m in st.session_state.messages
                         ],
                     )
-                    response = chat_use_case.execute(request)
-                    st.markdown(response.content)
-                    add_message("assistant", response.content)
+                    content = response["content"]
+                    st.markdown(content)
+                    add_message("assistant", content)
                 except Exception as e:
                     error_msg = f"Error: {str(e)}"
                     st.error(error_msg)
