@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import Union
 
-from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
+from src.domain.entities.metadata import Metadata
 
 
 @dataclass
@@ -14,6 +13,6 @@ class ProcessDocumentRequest:
 @dataclass
 class ProcessDocumentResponse:
     success: bool
-    metadata: Union[Metadata, CurriculumVitae, Receipt]
+    metadata: Metadata
     chunks_created: int
     message: str = ""

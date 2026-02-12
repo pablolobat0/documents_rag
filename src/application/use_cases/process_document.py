@@ -5,9 +5,7 @@ from src.application.dto.upload_dto import (
     ProcessDocumentRequest,
     ProcessDocumentResponse,
 )
-from src.domain.entities.metadata import CurriculumVitae, Metadata, Receipt
-from src.domain.ports.document_classifier_port import DocumentClassifierPort
-from src.domain.ports.metadata_extractor_port import MetadataExtractorPort
+from src.domain.entities.metadata import Metadata
 from src.domain.ports.text_splitter_port import TextSplitterPort
 from src.domain.ports.vector_store_port import VectorStorePort
 from src.infrastructure.processing.content_extractor_registry import (
@@ -25,14 +23,10 @@ class ProcessDocumentUseCase:
         vector_store: VectorStorePort,
         content_extractor_registry: ContentExtractorRegistry,
         text_splitter: TextSplitterPort,
-        document_classifier: DocumentClassifierPort,
-        metadata_extractor: MetadataExtractorPort,
     ):
         self._vector_store = vector_store
         self._content_extractor_registry = content_extractor_registry
         self._text_splitter = text_splitter
-        self._document_classifier = document_classifier
-        self._metadata_extractor = metadata_extractor
 
     def execute(self, request: ProcessDocumentRequest) -> ProcessDocumentResponse:
         """Process a document and store it in the vector database."""
@@ -50,9 +44,9 @@ class ProcessDocumentUseCase:
                 )
 
             # Extract content with page/section information
-            page_contents, pages = extractor.extract_content(request.content)
+            result = extractor.extract_content(request.content)
 
-            if not page_contents:
+            if not result.page_contents:
                 return ProcessDocumentResponse(
                     success=False,
                     metadata=Metadata(pages=0),
@@ -60,35 +54,29 @@ class ProcessDocumentUseCase:
                     message="No content found in document",
                 )
 
-            # Build base metadata
-            base_metadata = Metadata(
-                pages=pages,
+            now = datetime.now()
+            metadata = Metadata(
+                pages=result.total_pages,
                 document_name=request.filename,
                 file_size=len(request.content),
                 file_type=request.content_type,
-                created_at=datetime.now(),
-                processed_at=datetime.now(),
+                created_at=now,
+                processed_at=now,
+                frontmatter=result.document_metadata,
             )
 
-            # Classification and metadata extraction (using full text)
-            full_text = "\n".join(pc.content for pc in page_contents)
-            doc_type = self._document_classifier.classify(full_text)
-            extracted_metadata = self._metadata_extractor.extract(
-                full_text, doc_type, base_metadata
-            )
-
-            # Build metadata dict for chunks
-            chunk_base_metadata = self._build_chunk_metadata(
-                extracted_metadata, doc_type
-            )
+            # Build chunk metadata combining file info and frontmatter
+            chunk_metadata = self._build_chunk_metadata(metadata)
 
             # Split pages into chunks with metadata
-            chunks = self._text_splitter.split_pages(page_contents, chunk_base_metadata)
+            chunks = self._text_splitter.split_pages(
+                result.page_contents, chunk_metadata
+            )
 
             if not chunks:
                 return ProcessDocumentResponse(
                     success=False,
-                    metadata=base_metadata,
+                    metadata=metadata,
                     chunks_created=0,
                     message="No chunks created from document",
                 )
@@ -98,7 +86,7 @@ class ProcessDocumentUseCase:
 
             return ProcessDocumentResponse(
                 success=True,
-                metadata=extracted_metadata,
+                metadata=metadata,
                 chunks_created=len(chunks),
                 message="Document processed successfully",
             )
@@ -111,36 +99,22 @@ class ProcessDocumentUseCase:
                 message=f"Error processing document: {str(e)}",
             )
 
-    def _build_chunk_metadata(self, metadata: Metadata, doc_type) -> dict:
-        """Build a flat metadata dict for chunks from the extracted metadata."""
+    def _build_chunk_metadata(self, metadata: Metadata) -> dict:
+        """Build a flat metadata dict for chunks from file info and frontmatter."""
         base = {
             "document_name": metadata.document_name,
             "file_type": metadata.file_type,
             "file_size": metadata.file_size,
             "total_pages": metadata.pages,
-            "document_type": doc_type.value,
             "created_at": metadata.created_at,
             "processed_at": metadata.processed_at,
         }
 
-        # Add type-specific fields
-        if isinstance(metadata, CurriculumVitae):
-            base.update(
-                {
-                    "cv_name": metadata.name,
-                    "cv_email": metadata.email,
-                    "cv_phone": metadata.phone_number,
-                    "cv_linkedin": metadata.linkedin_profile,
-                    "cv_skills": metadata.skills,
-                }
-            )
-        elif isinstance(metadata, Receipt):
-            base.update(
-                {
-                    "receipt_merchant": metadata.merchant_name,
-                    "receipt_date": metadata.transaction_date,
-                    "receipt_total": metadata.total_amount,
-                }
-            )
+        # Flatten frontmatter values into chunk metadata
+        for key, value in metadata.frontmatter.items():
+            if isinstance(value, list):
+                base[key] = ", ".join(str(v) for v in value)
+            else:
+                base[key] = value
 
         return base

@@ -18,6 +18,8 @@ dependencies = [
     "cryptography>=45.0.7",
     "langmem>=0.0.29",
     "pillow>=10.4.0",
+    "pyyaml>=6.0",
+    "fastembed>=0.4.0",
 ]
 
 [tool.black]
@@ -26,3 +28,13 @@ line-length = 88
 [tool.flake8]
 max-line-length = 88
 extend-ignore = ["E203", "W503"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]

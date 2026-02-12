@@ -3,6 +3,7 @@ import logging
 
 import pypdf
 
+from src.domain.value_objects.extraction_result import ExtractionResult
 from src.domain.value_objects.page_content import PageContent
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
 
@@ -19,12 +20,12 @@ class PypdfProcessor:
     def supported_content_types(self) -> list[str]:
         return ["application/pdf"]
 
-    def extract_content(self, file_content: bytes) -> tuple[list[PageContent], int]:
+    def extract_content(self, file_content: bytes) -> ExtractionResult:
         """
         Extract text and image descriptions from a PDF.
 
         Returns:
-            Tuple of (list of PageContent with page numbers, number of pages)
+            ExtractionResult with page contents and total pages
         """
         try:
             pdf_file = io.BytesIO(file_content)
@@ -78,7 +79,9 @@ class PypdfProcessor:
             if not documents:
                 raise ValueError("No extractable content found in PDF")
 
-            return documents, pdf_pages
+            return ExtractionResult(
+                page_contents=documents, total_pages=pdf_pages
+            )
 
         except Exception as e:
             raise ValueError(f"Failed to process PDF: {str(e)}")

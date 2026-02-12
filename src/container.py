@@ -14,10 +14,8 @@ from src.infrastructure.agent.langgraph import LanggraphAgent
 from src.infrastructure.processing.content_extractor_registry import (
     ContentExtractorRegistry,
 )
-from src.infrastructure.processing.document_classifier import KeywordClassifier
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
 from src.infrastructure.processing.markdown_processor import MarkdownProcessor
-from src.infrastructure.processing.metadata_extractor import LLMMetadataExtractor
 from src.infrastructure.processing.pdf_processor import PypdfProcessor
 from src.infrastructure.processing.text_processor import PlainTextProcessor
 from src.infrastructure.processing.text_splitter import LangchainTextSplitter
@@ -128,14 +126,6 @@ class Container:
         return registry
 
     @cached_property
-    def document_classifier(self) -> KeywordClassifier:
-        return KeywordClassifier(llm=self.chat_model)
-
-    @cached_property
-    def metadata_extractor(self) -> LLMMetadataExtractor:
-        return LLMMetadataExtractor(llm=self.chat_model)
-
-    @cached_property
     def text_splitter(self) -> LangchainTextSplitter:
         return LangchainTextSplitter(
             chunk_size=settings.chunk_size,
@@ -164,8 +154,6 @@ class Container:
             vector_store=self.qdrant,
             content_extractor_registry=self.content_extractor_registry,
             text_splitter=self.text_splitter,
-            document_classifier=self.document_classifier,
-            metadata_extractor=self.metadata_extractor,
         )
 
     @cached_property

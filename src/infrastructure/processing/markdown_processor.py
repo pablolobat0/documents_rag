@@ -1,6 +1,12 @@
+import logging
 import re
 
+import yaml
+
+from src.domain.value_objects.extraction_result import ExtractionResult
 from src.domain.value_objects.page_content import PageContent
+
+logger = logging.getLogger(__name__)
 
 
 class MarkdownProcessor:
@@ -10,18 +16,20 @@ class MarkdownProcessor:
     def supported_content_types(self) -> list[str]:
         return ["text/markdown", "text/x-markdown"]
 
-    def extract_content(self, file_content: bytes) -> tuple[list[PageContent], int]:
+    def extract_content(self, file_content: bytes) -> ExtractionResult:
         """
         Extract content from a Markdown file, splitting on H1/H2 headers.
+        Parses YAML frontmatter if present and strips it from content.
 
         Args:
             file_content: Raw file bytes
 
         Returns:
-            Tuple of (list of PageContent with section numbers, total sections)
+            ExtractionResult with sections, total count, and frontmatter metadata
         """
         text = file_content.decode("utf-8")
-        sections = self._split_by_headers(text)
+        frontmatter, body = self._parse_frontmatter(text)
+        sections = self._split_by_headers(body)
 
         page_contents = []
         for idx, (title, content) in enumerate(sections, start=1):
@@ -35,11 +43,38 @@ class MarkdownProcessor:
                     )
                 )
 
-        # Handle edge case: empty file
         if not page_contents:
-            return [], 0
+            return ExtractionResult(page_contents=[], total_pages=0)
 
-        return page_contents, len(page_contents)
+        return ExtractionResult(
+            page_contents=page_contents,
+            total_pages=len(page_contents),
+            document_metadata=frontmatter,
+        )
+
+    def _parse_frontmatter(self, text: str) -> tuple[dict, str]:
+        """
+        Extract YAML frontmatter from text.
+
+        Returns:
+            Tuple of (frontmatter dict, remaining body text)
+        """
+        pattern = r"^---\s*\n(.*?)\n---\s*\n?(.*)"
+        match = re.match(pattern, text, re.DOTALL)
+        if not match:
+            return {}, text
+
+        yaml_block = match.group(1)
+        body = match.group(2)
+        try:
+            parsed = yaml.safe_load(yaml_block)
+            if not isinstance(parsed, dict):
+                logger.warning("Frontmatter is not a YAML mapping, ignoring")
+                return {}, text
+            return parsed, body
+        except yaml.YAMLError as e:
+            logger.warning("Failed to parse YAML frontmatter: %s", e)
+            return {}, text
 
     def _split_by_headers(self, text: str) -> list[tuple[str | None, str]]:
         """
