@@ -1,7 +1,6 @@
 import pytest
 
 from src.domain.value_objects.chat_message import ChatMessage, SessionId
-from src.domain.value_objects.file_info import FileInfo
 
 
 class TestChatMessage:
@@ -31,22 +30,3 @@ class TestSessionId:
     def test_empty_string_raises(self):
         with pytest.raises(ValueError, match="cannot be empty"):
             SessionId(value="")
-
-
-class TestFileInfo:
-    def test_valid_info(self):
-        fi = FileInfo(filename="doc.pdf", content_type="application/pdf", size=1024)
-        assert fi.filename == "doc.pdf"
-        assert fi.size == 1024
-
-    def test_negative_size_raises(self):
-        with pytest.raises(ValueError, match="cannot be negative"):
-            FileInfo(filename="doc.pdf", content_type="application/pdf", size=-1)
-
-    def test_zero_size_allowed(self):
-        fi = FileInfo(filename="empty.txt", content_type="text/plain", size=0)
-        assert fi.size == 0
-
-    def test_empty_filename_raises(self):
-        with pytest.raises(ValueError, match="cannot be empty"):
-            FileInfo(filename="", content_type="text/plain", size=100)
