@@ -11,6 +11,11 @@ class VectorStorePort(Protocol):
         """Insert or update document chunks with per-chunk metadata."""
         ...
 
-    def search(self, query: str, num_documents: int) -> list[RetrievedDocument]:
+    def search(
+        self,
+        query: str,
+        num_documents: int,
+        filters: dict[str, str | list[str]] | None = None,
+    ) -> list[RetrievedDocument]:
         """Get relevant documents."""
         ...

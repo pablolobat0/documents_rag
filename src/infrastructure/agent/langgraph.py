@@ -1,9 +1,9 @@
 import logging
 import re
 
-from langchain.tools import Tool
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.tools import StructuredTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -11,7 +11,8 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from src.domain.ports.vector_store_port import VectorStorePort
 from src.domain.prompts.agent import AgentPrompts
 from src.domain.value_objects.chat_message import ChatMessage
-from src.infrastructure.agent.schemas import RankedDocuments
+from src.domain.value_objects.document_classification import DocumentTag, DocumentType
+from src.infrastructure.agent.schemas import RankedDocuments, SearchDocumentsInput
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,11 @@ class LanggraphAgent:
         self.vector_store = vector_store
         self._retrieval_num_documents = retrieval_num_documents
 
-        retriever_tool = Tool(
+        retriever_tool = StructuredTool.from_function(
             name="search_documents",
-            description="Searches through uploaded documents to find relevant information based on a query. Returns document snippets that can be used to answer user questions.",
+            description="Searches through uploaded documents to find relevant information based on a query. Returns document snippets that can be used to answer user questions. Use the 'type' and 'tags' parameters to filter by document type or topic when the user's query clearly implies them.",
             func=self._retrieve_documents,
+            args_schema=SearchDocumentsInput,
         )
 
         self._tools = [retriever_tool]
@@ -99,11 +101,24 @@ class LanggraphAgent:
 
         return {"messages": [response]}
 
-    def _retrieve_documents(self, query: str) -> list[str]:
+    def _retrieve_documents(
+        self,
+        query: str,
+        type: DocumentType | None = None,
+        tags: list[DocumentTag] | None = None,
+    ) -> list[str]:
         """Search documents and return relevant snippets based on the query."""
         try:
+            filters: dict[str, str | list[str]] | None = None
+            if type or tags:
+                filters = {}
+                if type:
+                    filters["type"] = type
+                if tags:
+                    filters["tags"] = list(tags)
+
             retrieved_docs = self.vector_store.search(
-                query, self._retrieval_num_documents
+                query, self._retrieval_num_documents, filters=filters
             )
 
             if not retrieved_docs:

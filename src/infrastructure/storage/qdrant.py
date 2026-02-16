@@ -64,13 +64,22 @@ class QdrantVectorStore:
 
         self._vector_store.add_texts(texts=texts, metadatas=metadatas)
 
-    def search(self, query: str, num_documents: int) -> list[RetrievedDocument]:
+    def search(
+        self,
+        query: str,
+        num_documents: int,
+        filters: dict[str, str | list[str]] | None = None,
+    ) -> list[RetrievedDocument]:
         """Search for relevant documents and return domain objects."""
         if not query or not query.strip():
             logger.warning("Empty query provided for search")
             return []
 
-        docs = self._vector_store.similarity_search(query, k=num_documents)
+        kwargs: dict = {"query": query, "k": num_documents}
+        if filters:
+            kwargs["filter"] = self._build_filter(filters)
+
+        docs = self._vector_store.similarity_search(**kwargs)
         return [
             RetrievedDocument(
                 page_content=doc.page_content,
@@ -78,3 +87,25 @@ class QdrantVectorStore:
             )
             for doc in docs
         ]
+
+    @staticmethod
+    def _build_filter(filters: dict[str, str | list[str]]) -> models.Filter:
+        """Translate a dict of filters into a Qdrant Filter object."""
+        conditions = []
+        for key, value in filters.items():
+            field_path = f"metadata.{key}"
+            if isinstance(value, list):
+                conditions.append(
+                    models.FieldCondition(
+                        key=field_path,
+                        match=models.MatchAny(any=value),
+                    )
+                )
+            else:
+                conditions.append(
+                    models.FieldCondition(
+                        key=field_path,
+                        match=models.MatchValue(value=value),
+                    )
+                )
+        return models.Filter(must=conditions)

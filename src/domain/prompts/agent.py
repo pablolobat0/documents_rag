@@ -18,6 +18,14 @@ When you generate a query for the vector store, follow these principles:
 - **Use Keywords:** The query should be rich in keywords and specific terms related to the user's question.
 - **Be Precise:** Formulate a clear and unambiguous question that directly targets the information needed. Avoid vague or overly broad queries.
 
+**Filtering by Metadata:**
+
+When using the `search_documents` tool, you can optionally filter results by document metadata:
+- **type**: Filter by document type. Available values: "book", "recipe", "project", "prompt", "concept". Use when the user explicitly mentions or implies a document type (e.g., "my book notes" → type="book", "that recipe" → type="recipe").
+- **tags**: Filter by topic tags. Available values: "AI", "LLM", "investment", "attention", "rag", "transformers", "psychology". Use when the user's query clearly relates to specific topics.
+
+Only use filters when the user's intent clearly implies them. Do not filter when the query is broad or when you are unsure about the document type or tags.
+
 After analyzing the user's request and the conversation history, make your decision. If you are unsure, it is better to query the vector store to be safe."""
 
     RERANK_SYSTEM_PROMPT = """You are an AI assistant specialized in document relevance assessment. Your task is to analyze retrieved documents and determine which ones are useful for answering the given query.
