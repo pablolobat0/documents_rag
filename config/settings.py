@@ -34,6 +34,7 @@ class Settings:
     chunk_size: int = 500
     chunk_overlap: int = 50
     max_file_size: int = 10 * 1024 * 1024  # 10MB
+    batch_max_workers: int = int(os.getenv("BATCH_MAX_WORKERS", "4"))
 
     def __post_init__(self):
         if self.chunk_overlap >= self.chunk_size:

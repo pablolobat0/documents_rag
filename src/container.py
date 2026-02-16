@@ -159,7 +159,8 @@ class Container:
     @cached_property
     def batch_process_document_use_case(self) -> BatchProcessDocumentUseCase:
         return BatchProcessDocumentUseCase(
-            process_document_use_case=self.process_document_use_case
+            process_document_use_case=self.process_document_use_case,
+            max_workers=settings.batch_max_workers,
         )
 
 

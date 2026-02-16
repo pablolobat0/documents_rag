@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -38,7 +38,9 @@ def mock_inner_uc():
 
 @pytest.fixture
 def use_case(mock_inner_uc):
-    return BatchProcessDocumentUseCase(process_document_use_case=mock_inner_uc)
+    return BatchProcessDocumentUseCase(
+        process_document_use_case=mock_inner_uc, max_workers=1
+    )
 
 
 class TestBatchExecute:
@@ -99,8 +101,10 @@ class TestBatchExecute:
         )
         use_case.execute(request, progress_callback=callback)
         assert len(callback.call_args_list) == 2
-        assert callback.call_args_list[0] == call(1, 2, "a.txt")
-        assert callback.call_args_list[1] == call(2, 2, "b.txt")
+        counters = {c.args[0] for c in callback.call_args_list}
+        assert counters == {1, 2}
+        filenames = {c.args[2] for c in callback.call_args_list}
+        assert filenames == {"a.txt", "b.txt"}
 
     def test_empty_batch(self, use_case, mock_inner_uc):
         request = BatchProcessDocumentRequest(documents=[])
