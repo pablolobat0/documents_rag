@@ -15,6 +15,9 @@ from src.infrastructure.processing.content_extractor_registry import (
     ContentExtractorRegistry,
 )
 from src.infrastructure.processing.image_captioner import LangchainImageCaptioner
+from src.infrastructure.processing.llm_metadata_classifier import (
+    LlmMetadataClassifier,
+)
 from src.infrastructure.processing.markdown_processor import MarkdownProcessor
 from src.infrastructure.processing.pdf_processor import PypdfProcessor
 from src.infrastructure.processing.text_processor import PlainTextProcessor
@@ -126,6 +129,10 @@ class Container:
         return registry
 
     @cached_property
+    def metadata_classifier(self) -> LlmMetadataClassifier:
+        return LlmMetadataClassifier(llm=self.summary_model)
+
+    @cached_property
     def text_splitter(self) -> LangchainTextSplitter:
         return LangchainTextSplitter(
             chunk_size=settings.chunk_size,
@@ -155,6 +162,7 @@ class Container:
             vector_store=self.qdrant,
             content_extractor_registry=self.content_extractor_registry,
             text_splitter=self.text_splitter,
+            metadata_classifier=self.metadata_classifier,
         )
 
     @cached_property
