@@ -31,9 +31,11 @@ class LanggraphAgent:
         llm: BaseChatModel,
         vector_store: VectorStorePort,
         checkpointer: BaseCheckpointSaver,
+        retrieval_num_documents: int = 10,
     ) -> None:
         self._llm = llm
         self.vector_store = vector_store
+        self._retrieval_num_documents = retrieval_num_documents
 
         retriever_tool = Tool(
             name="search_documents",
@@ -100,7 +102,9 @@ class LanggraphAgent:
     def _retrieve_documents(self, query: str) -> list[str]:
         """Search documents and return relevant snippets based on the query."""
         try:
-            retrieved_docs = self.vector_store.search(query, 10)
+            retrieved_docs = self.vector_store.search(
+                query, self._retrieval_num_documents
+            )
 
             if not retrieved_docs:
                 return ["No relevant documents found for this query."]

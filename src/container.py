@@ -142,6 +142,7 @@ class Container:
             llm=self.chat_model,
             vector_store=self.qdrant,
             checkpointer=self.checkpointer,
+            retrieval_num_documents=settings.retrieval_num_documents,
         )
 
     @cached_property
