@@ -39,6 +39,14 @@ class Settings:
     # Retrieval
     retrieval_num_documents: int = int(os.getenv("RETRIEVAL_NUM_DOCUMENTS", "10"))
 
+    # CORS
+    cors_allowed_origins: str = os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:8501"
+    )
+
+    # Auth
+    api_key: str = os.getenv("API_KEY", "")
+
     def __post_init__(self):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError(

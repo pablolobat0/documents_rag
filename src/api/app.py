@@ -1,9 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import settings
+from src.api.dependencies import verify_api_key
 from src.api.routes.chat import router as chat_router
 from src.api.routes.documents import router as documents_router
 from src.container import get_container
@@ -29,7 +31,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-api_router = APIRouter()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+api_router = APIRouter(dependencies=[Depends(verify_api_key)])
 api_router.include_router(documents_router)
 api_router.include_router(chat_router)
 app.include_router(api_router, prefix=settings.api_prefix)

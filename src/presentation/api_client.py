@@ -8,6 +8,9 @@ class ApiClient:
 
     def __init__(self, base_url: str = settings.api_url):
         self._base_url = f"{base_url}{settings.api_prefix}"
+        self._headers: dict[str, str] = {}
+        if settings.api_key:
+            self._headers["X-API-Key"] = settings.api_key
 
     def send_documents(self, files: list[tuple[str, bytes, str]]) -> dict:
         """Upload documents to the API.
@@ -26,6 +29,7 @@ class ApiClient:
             response = client.post(
                 f"{self._base_url}/documents/batch",
                 files=multipart_files,
+                headers=self._headers,
             )
             response.raise_for_status()
             return response.json()
@@ -44,6 +48,7 @@ class ApiClient:
             response = client.post(
                 f"{self._base_url}/chat",
                 json={"session_id": session_id, "messages": messages},
+                headers=self._headers,
             )
             response.raise_for_status()
             return response.json()

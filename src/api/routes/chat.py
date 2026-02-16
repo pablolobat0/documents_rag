@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
 
 
+def _parse_chat_request(request: ChatRequestSchema) -> ChatRequest:
+    try:
+        return ChatRequest(
+            session_id=SessionId(request.session_id),
+            messages=[
+                ChatMessage(role=m.role, content=m.content) for m in request.messages
+            ],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post(
     "/chat",
     response_model=ChatResponseSchema,
@@ -22,16 +34,7 @@ router = APIRouter(tags=["Chat"])
 )
 async def chat(request: ChatRequestSchema) -> ChatResponseSchema:
     container = get_container()
-
-    try:
-        chat_request = ChatRequest(
-            session_id=SessionId(request.session_id),
-            messages=[
-                ChatMessage(role=m.role, content=m.content) for m in request.messages
-            ],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    chat_request = _parse_chat_request(request)
 
     try:
         response = container.chat_use_case.execute(chat_request)
