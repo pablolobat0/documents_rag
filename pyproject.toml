@@ -24,6 +24,9 @@ dependencies = [
     "uvicorn>=0.34.0",
     "python-multipart>=0.0.18",
     "httpx>=0.28.0",
+    "typer>=0.23.0",
+    "rich>=14.3.2",
+    "datasets>=3.0.0",
 ]
 
 [tool.pytest.ini_options]

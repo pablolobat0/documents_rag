@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 
 from langchain_core.embeddings import Embeddings
 from langchain_qdrant import FastEmbedSparse, RetrievalMode
@@ -88,8 +89,25 @@ class QdrantVectorStore:
             for doc in docs
         ]
 
+    def collection_exists(self) -> bool:
+        """Check whether the underlying collection exists."""
+        return self.client.collection_exists(self.collection_name)
+
+    def delete_collection(self) -> None:
+        """Delete the underlying collection."""
+        self.client.delete_collection(self.collection_name)
+
+    def count_chunks(self, filters: dict[str, str | int | list[str]]) -> int:
+        """Count chunks matching the given filters."""
+        qdrant_filter = self._build_filter(filters)
+        result = self.client.count(
+            collection_name=self.collection_name,
+            count_filter=qdrant_filter,
+        )
+        return result.count
+
     @staticmethod
-    def _build_filter(filters: dict[str, str | list[str]]) -> models.Filter:
+    def _build_filter(filters: Mapping[str, str | int | list[str]]) -> models.Filter:
         """Translate a dict of filters into a Qdrant Filter object."""
         conditions = []
         for key, value in filters.items():

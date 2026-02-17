@@ -19,3 +19,15 @@ class VectorStorePort(Protocol):
     ) -> list[RetrievedDocument]:
         """Get relevant documents."""
         ...
+
+    def collection_exists(self) -> bool:
+        """Check whether the underlying collection exists."""
+        ...
+
+    def delete_collection(self) -> None:
+        """Delete the underlying collection."""
+        ...
+
+    def count_chunks(self, filters: dict[str, str | int | list[str]]) -> int:
+        """Count chunks matching the given filters."""
+        ...

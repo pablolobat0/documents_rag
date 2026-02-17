@@ -19,3 +19,7 @@ wheels/
 # Project
 document_metadata/
 CLAUDE.md
+
+# Evaluation
+evaluation/samples_cache.json
+.coverage
